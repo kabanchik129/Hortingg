@@ -1,9 +1,6 @@
 <!DOCTYPE html>
 <html lang="uk">
 <head>
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="supabase-config.js"></script>
-<head>    
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Хортинг | Вхід</title>
@@ -12,8 +9,114 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+    
+    <style>
+        /* Дополнительные стили для индикатора синхронизации */
+        .sync-status {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1000;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .sync-online {
+            background: rgba(26, 147, 111, 0.2);
+            color: #1a936f;
+            border-color: rgba(26, 147, 111, 0.3);
+        }
+        
+        .sync-offline {
+            background: rgba(255, 107, 107, 0.2);
+            color: #ff6b6b;
+            border-color: rgba(255, 107, 107, 0.3);
+        }
+        
+        .sync-pending {
+            background: rgba(255, 214, 10, 0.2);
+            color: #ffd60a;
+            border-color: rgba(255, 214, 10, 0.3);
+        }
+        
+        .sync-icon {
+            animation: spin 2s linear infinite;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        /* Стили для офлайн режима */
+        .offline-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(10, 14, 23, 0.95);
+            z-index: 9999;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            text-align: center;
+        }
+        
+        .offline-overlay.active {
+            display: flex;
+        }
+        
+        .offline-icon {
+            font-size: 64px;
+            color: #ff6b6b;
+            margin-bottom: 20px;
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+    </style>
 </head>
 <body class="login-page">
+    <!-- Индикатор синхронизации -->
+    <div id="syncStatus" class="sync-status sync-pending">
+        <i class="fas fa-sync-alt sync-icon"></i>
+        <span>Підключення...</span>
+    </div>
+    
+    <!-- Офлайн оверлей -->
+    <div id="offlineOverlay" class="offline-overlay">
+        <div class="offline-icon">
+            <i class="fas fa-wifi-slash"></i>
+        </div>
+        <h2 style="color: #ff6b6b; margin-bottom: 10px;">Офлайн режим</h2>
+        <p style="color: rgba(255, 255, 255, 0.7); max-width: 400px; margin-bottom: 20px;">
+            Немає підключення до інтернету. Використовуються локальні дані.
+            Зміни зберігаться локально та синхронізуються, коли з'явиться з'єднання.
+        </p>
+        <button class="btn-primary" onclick="hideOfflineOverlay()" style="padding: 12px 24px;">
+            <i class="fas fa-check"></i> Продовжити роботу
+        </button>
+    </div>
+    
     <div class="gradient-bg"></div>
     <div class="particles" id="particles"></div>
     
@@ -28,6 +131,11 @@
                     <h1>Хортинг</h1>
                 </div>
                 <p class="tagline">Військово-патріотична спільнота</p>
+                <div id="firebaseStatus" style="margin-top: 10px;">
+                    <small style="color: rgba(255, 255, 255, 0.5);">
+                        <i class="fas fa-cloud"></i> Хмарне зберігання даних
+                    </small>
+                </div>
             </div>
 
             <!-- Форма входа -->
@@ -68,17 +176,169 @@
                             <p class="small-text">Для перевірки системи використовуйте цей пароль</p>
                         </div>
                     </div>
+                    
+                    <!-- Быстрый вход для тестирования -->
+                    <div class="quick-login" style="margin-top: 20px; padding: 15px; background: rgba(157, 78, 221, 0.1); border-radius: 12px; border-left: 4px solid #9d4edd;">
+                        <h4 style="color: #9d4edd; font-size: 14px; margin-bottom: 10px; display: flex; align-items: center; gap: 8px;">
+                            <i class="fas fa-bolt"></i> Швидкий вхід (для тесту)
+                        </h4>
+                        <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+                            <button class="quick-btn" onclick="quickLogin('kyka7')" style="flex: 1; min-width: 80px; padding: 8px 12px; background: rgba(157, 78, 221, 0.2); border: 1px solid #9d4edd; border-radius: 6px; color: white; font-size: 12px; cursor: pointer;">
+                                Адмін
+                            </button>
+                            <button class="quick-btn" onclick="quickLogin('mal1kab123_kam')" style="flex: 1; min-width: 80px; padding: 8px 12px; background: rgba(255, 107, 107, 0.2); border: 1px solid #ff6b6b; border-radius: 6px; color: white; font-size: 12px; cursor: pointer;">
+                                Ком. 1
+                            </button>
+                            <button class="quick-btn" onclick="quickLogin('str4kab456_zam')" style="flex: 1; min-width: 80px; padding: 8px 12px; background: rgba(41, 196, 255, 0.2); border: 1px solid #29c4ff; border-radius: 6px; color: white; font-size: 12px; cursor: pointer;">
+                                Зам. 4
+                            </button>
+                            <button class="quick-btn" onclick="quickLogin('mal2kab777')" style="flex: 1; min-width: 80px; padding: 8px 12px; background: rgba(255, 214, 10, 0.2); border: 1px solid #ffd60a; border-radius: 6px; color: white; font-size: 12px; cursor: pointer;">
+                                Боець 2
+                            </button>
+                        </div>
+                    </div>
                 </div>
             </div>
 
             <!-- Футер -->
             <footer>
                 <p>© 2024 Хортинг. Лише для авторизованих користувачів</p>
+                <div id="firebaseInfo" style="margin-top: 10px; font-size: 12px; color: rgba(255, 255, 255, 0.4);">
+                    <i class="fas fa-database"></i> Дані зберігаються в хмарі
+                </div>
             </footer>
         </div>
     </div>
 
+    <!-- Firebase конфигурация и инициализация -->
+    <script>
+        // Конфигурация Firebase (замените на свои данные)
+        const firebaseConfig = {
+            apiKey: "AIzaSyD...YOUR_API_KEY...",
+            authDomain: "horting-system.firebaseapp.com",
+            projectId: "horting-system",
+            storageBucket: "horting-system.appspot.com",
+            messagingSenderId: "123456789012",
+            appId: "1:123456789012:web:abcdef1234567890"
+        };
+
+        // Инициализация Firebase
+        let firebaseApp, firestore, auth;
+        
+        try {
+            // Инициализируем Firebase
+            firebaseApp = firebase.initializeApp(firebaseConfig);
+            firestore = firebase.firestore(firebaseApp);
+            auth = firebase.auth(firebaseApp);
+            
+            console.log('Firebase инициализирован');
+            
+            // Включаем офлайн поддержку
+            firestore.enablePersistence()
+                .then(() => {
+                    console.log('Офлайн поддержка включена');
+                    updateSyncStatus('online');
+                })
+                .catch((err) => {
+                    console.warn('Офлайн поддержка не доступна:', err);
+                    updateSyncStatus('online');
+                });
+            
+            // Слушаем изменения состояния сети
+            firestore.onSnapshotsInSync(() => {
+                updateSyncStatus('online');
+            });
+            
+        } catch (error) {
+            console.error('Ошибка инициализации Firebase:', error);
+            updateSyncStatus('offline');
+            showOfflineOverlay();
+        }
+
+        // Глобальные переменные для доступа
+        window.firebaseApp = firebaseApp;
+        window.firestore = firestore;
+        window.auth = auth;
+
+        // Обновление статуса синхронизации
+        function updateSyncStatus(status) {
+            const syncElement = document.getElementById('syncStatus');
+            const firebaseInfo = document.getElementById('firebaseInfo');
+            
+            if (syncElement) {
+                syncElement.className = 'sync-status';
+                
+                switch(status) {
+                    case 'online':
+                        syncElement.classList.add('sync-online');
+                        syncElement.innerHTML = '<i class="fas fa-check-circle"></i><span>Онлайн</span>';
+                        break;
+                    case 'offline':
+                        syncElement.classList.add('sync-offline');
+                        syncElement.innerHTML = '<i class="fas fa-exclamation-circle"></i><span>Офлайн</span>';
+                        break;
+                    case 'pending':
+                        syncElement.classList.add('sync-pending');
+                        syncElement.innerHTML = '<i class="fas fa-sync-alt sync-icon"></i><span>Синхронізація...</span>';
+                        break;
+                }
+            }
+            
+            if (firebaseInfo) {
+                if (status === 'online') {
+                    firebaseInfo.innerHTML = '<i class="fas fa-cloud"></i> Дані синхронізовані з хмарою';
+                } else if (status === 'offline') {
+                    firebaseInfo.innerHTML = '<i class="fas fa-laptop"></i> Робота в офлайн режимі';
+                }
+            }
+            
+            // Скрываем офлайн оверлей если онлайн
+            if (status === 'online') {
+                hideOfflineOverlay();
+            }
+        }
+
+        // Показать офлайн оверлей
+        function showOfflineOverlay() {
+            const overlay = document.getElementById('offlineOverlay');
+            if (overlay) {
+                overlay.classList.add('active');
+            }
+        }
+
+        // Скрыть офлайн оверлей
+        function hideOfflineOverlay() {
+            const overlay = document.getElementById('offlineOverlay');
+            if (overlay) {
+                overlay.classList.remove('active');
+            }
+        }
+
+        // Проверка соединения
+        function checkConnection() {
+            if (!navigator.onLine) {
+                updateSyncStatus('offline');
+                showOfflineOverlay();
+                return false;
+            }
+            return true;
+        }
+
+        // Слушаем изменения состояния сети
+        window.addEventListener('online', () => {
+            updateSyncStatus('online');
+            hideOfflineOverlay();
+        });
+
+        window.addEventListener('offline', () => {
+            updateSyncStatus('offline');
+            showOfflineOverlay();
+        });
+    </script>
+
+    <!-- Основной скрипт приложения -->
     <script src="script.js"></script>
+    
     <script>
         // Создание частиц
         function createParticles() {
@@ -132,9 +392,18 @@
         // Кнопка входа
         document.getElementById('loginBtn').addEventListener('click', login);
         
+        // Быстрый вход
+        function quickLogin(password) {
+            document.getElementById('passwordInput').value = password;
+            login();
+        }
+        
         // Инициализация
         document.addEventListener('DOMContentLoaded', function() {
             createParticles();
+            
+            // Проверяем соединение
+            checkConnection();
             
             // Автофокус на поле ввода
             setTimeout(() => {
@@ -150,7 +419,137 @@
                     window.location.href = 'team.html';
                 }
             }
+            
+            // Инициализируем Firebase DataManager
+            initializeFirebaseData();
         });
+
+        // Инициализация менеджера данных Firebase
+        async function initializeFirebaseData() {
+            // Проверяем, доступен ли Firebase
+            if (!window.firestore) {
+                console.log('Firebase не доступен, используем localStorage');
+                return;
+            }
+            
+            try {
+                // Проверяем подключение к Firestore
+                const teamsRef = firestore.collection('teams').limit(1);
+                await teamsRef.get();
+                
+                console.log('Firestore подключен успешно');
+                updateSyncStatus('online');
+                
+                // Загружаем начальные данные если нужно
+                await initializeDefaultData();
+                
+            } catch (error) {
+                console.error('Ошибка подключения к Firestore:', error);
+                updateSyncStatus('offline');
+            }
+        }
+
+        // Инициализация начальных данных
+        async function initializeDefaultData() {
+            try {
+                // Проверяем, есть ли данные в Firestore
+                const teamsSnapshot = await firestore.collection('teams').get();
+                
+                if (teamsSnapshot.empty) {
+                    console.log('Создаем начальные данные в Firestore...');
+                    
+                    // Создаем команды
+                    const teamsData = {
+                        1: { name: "1-ша команда (молодша)", color: "#FF6B6B", type: "mal" },
+                        2: { name: "2-га команда (молодша)", color: "#4ECDC4", type: "mal" },
+                        3: { name: "3-тя команда (розвідка)", color: "#45B7D1", type: "mal" },
+                        4: { name: "4-та команда (старша)", color: "#96CEB4", type: "str" },
+                        5: { name: "5-та команда (старша)", color: "#FFEAA7", type: "str" },
+                        6: { name: "6-та команда (старша)", color: "#DDA0DD", type: "str" }
+                    };
+                    
+                    for (let i = 1; i <= 6; i++) {
+                        await firestore.collection('teams').doc(i.toString()).set({
+                            id: i,
+                            name: teamsData[i].name,
+                            type: teamsData[i].type,
+                            color: teamsData[i].color,
+                            members: [],
+                            notifications: [],
+                            tasks: [],
+                            absences: [],
+                            createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                        });
+                    }
+                    
+                    // Создаем глобальные уведомления
+                    await firestore.collection('global_notifications').add({
+                        title: 'Вітання з початком навчання!',
+                        message: 'Ласкаво просимо до гуртка "Хортинг". Бажаємо успіхів у навчанні!',
+                        author: 'Адміністратор',
+                        date: new Date().toISOString(),
+                        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                    
+                    console.log('Начальные данные созданы в Firestore');
+                }
+                
+            } catch (error) {
+                console.error('Ошибка инициализации данных:', error);
+            }
+        }
+
+        // Функция для работы с данными
+        window.firebaseData = {
+            // Получить команду
+            async getTeam(teamId) {
+                try {
+                    const doc = await firestore.collection('teams').doc(teamId.toString()).get();
+                    if (doc.exists) {
+                        return doc.data();
+                    }
+                    return null;
+                } catch (error) {
+                    console.error('Ошибка получения команды:', error);
+                    // Fallback на localStorage
+                    return JSON.parse(localStorage.getItem(`horting_team_${teamId}`)) || null;
+                }
+            },
+            
+            // Сохранить команду
+            async saveTeam(teamId, data) {
+                try {
+                    await firestore.collection('teams').doc(teamId.toString()).set({
+                        ...data,
+                        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                    }, { merge: true });
+                    console.log('Команда сохранена в Firestore');
+                } catch (error) {
+                    console.error('Ошибка сохранения команды:', error);
+                    // Fallback на localStorage
+                    localStorage.setItem(`horting_team_${teamId}`, JSON.stringify(data));
+                }
+            },
+            
+            // Получить глобальные уведомления
+            async getGlobalNotifications() {
+                try {
+                    const snapshot = await firestore.collection('global_notifications')
+                        .orderBy('createdAt', 'desc')
+                        .get();
+                    
+                    return snapshot.docs.map(doc => ({
+                        id: doc.id,
+                        ...doc.data()
+                    }));
+                } catch (error) {
+                    console.error('Ошибка получения уведомлений:', error);
+                    // Fallback на localStorage
+                    return JSON.parse(localStorage.getItem('horting_global_notifications')) || [];
+                }
+            }
+        };
     </script>
 </body>
 </html>
