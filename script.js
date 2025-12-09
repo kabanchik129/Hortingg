@@ -793,3 +793,183 @@ window.sendToAdmin = sendToAdmin;
 window.Modal = Modal;
 window.exitViewMode = exitViewMode;
 window.CONFIG = CONFIG;
+
+        // =================== Firebase функции ===================
+
+// Инициализация Firebase
+async function initFirebase() {
+    try {
+        if (window.firestore && window.firebaseApp) {
+            console.log('Firebase уже инициализирован');
+            return true;
+        }
+        
+        // Если Firebase не загружен, ждем
+        let attempts = 0;
+        while (!window.firebase && attempts < 10) {
+            await new Promise(resolve => setTimeout(resolve, 500));
+            attempts++;
+        }
+        
+        if (window.firebase && window.firebaseConfig) {
+            const app = firebase.initializeApp(window.firebaseConfig);
+            const db = firebase.firestore(app);
+            const auth = firebase.auth(app);
+            
+            window.firebaseApp = app;
+            window.firestore = db;
+            window.auth = auth;
+            
+            console.log('Firebase инициализирован');
+            return true;
+        }
+        
+        return false;
+    } catch (error) {
+        console.error('Ошибка инициализации Firebase:', error);
+        return false;
+    }
+}
+
+// Сохранить команду в Firebase
+async function saveTeamToFirebase(teamId, data) {
+    try {
+        if (!window.firestore) {
+            await initFirebase();
+        }
+        
+        if (window.firestore) {
+            await firestore.collection('teams').doc(teamId.toString()).set({
+                ...data,
+                id: teamId,
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+            }, { merge: true });
+            console.log(`Команда ${teamId} сохранена в Firebase`);
+            return true;
+        }
+    } catch (error) {
+        console.error('Ошибка сохранения в Firebase:', error);
+    }
+    
+    // Fallback на localStorage
+    localStorage.setItem(`horting_team_${teamId}`, JSON.stringify(data));
+    return false;
+}
+
+// Загрузить команду из Firebase
+async function loadTeamFromFirebase(teamId) {
+    try {
+        if (!window.firestore) {
+            await initFirebase();
+        }
+        
+        if (window.firestore) {
+            const doc = await firestore.collection('teams').doc(teamId.toString()).get();
+            if (doc.exists) {
+                console.log(`Команда ${teamId} загружена из Firebase`);
+                return doc.data();
+            }
+        }
+    } catch (error) {
+        console.error('Ошибка загрузки из Firebase:', error);
+    }
+    
+    // Fallback на localStorage
+    const localData = localStorage.getItem(`horting_team_${teamId}`);
+    return localData ? JSON.parse(localData) : null;
+}
+
+// Обновленный TeamManager для работы с Firebase
+const TeamManagerWithFirebase = {
+    ...TeamManager,
+    
+    // Переопределяем метод сохранения команды
+    saveTeam(teamId, teamData) {
+        // Сохраняем локально
+        ServerStorage.setTeam(teamId, teamData);
+        
+        // Сохраняем в Firebase (асинхронно)
+        saveTeamToFirebase(teamId, teamData).catch(error => {
+            console.error('Не удалось сохранить в Firebase:', error);
+        });
+    },
+    
+    // Переопределяем метод получения команды
+    getTeam(teamId) {
+        // Пробуем получить из Firebase если есть соединение
+        if (navigator.onLine) {
+            loadTeamFromFirebase(teamId).then(firebaseData => {
+                if (firebaseData) {
+                    // Если получили из Firebase, обновляем локальные данные
+                    localStorage.setItem(`horting_team_${teamId}`, JSON.stringify(firebaseData));
+                    return firebaseData;
+                }
+            }).catch(error => {
+                console.error('Ошибка загрузки из Firebase:', error);
+            });
+        }
+        
+        // Возвращаем локальные данные (могут быть устаревшими)
+        return ServerStorage.getTeam(teamId);
+    }
+};
+
+// Заменим глобальный TeamManager на обновленный
+window.TeamManager = TeamManagerWithFirebase;
+
+// Инициализация Firebase при загрузке страницы
+document.addEventListener('DOMContentLoaded', async function() {
+    // Инициализируем локальное хранилище
+    TeamManager.init();
+    
+    // Инициализируем Firebase
+    if (window.firebaseConfig) {
+        const firebaseLoaded = await initFirebase();
+        if (firebaseLoaded) {
+            console.log('Firebase готов к работе');
+            
+            // Загружаем начальные данные из Firebase при первом запуске
+            await initializeDefaultFirebaseData();
+        }
+    }
+    
+    // Остальной код инициализации...
+});
+
+// Функция для инициализации данных в Firebase
+async function initializeDefaultFirebaseData() {
+    try {
+        if (!window.firestore) return;
+        
+        // Проверяем, есть ли уже данные
+        const teamsSnapshot = await firestore.collection('teams').limit(1).get();
+        
+        if (teamsSnapshot.empty) {
+            console.log('Создаем начальные данные в Firebase...');
+            
+            // Создаем базовые команды
+            for (let i = 1; i <= 6; i++) {
+                const teamData = ServerStorage.getTeam(i);
+                if (teamData) {
+                    await firestore.collection('teams').doc(i.toString()).set({
+                        ...teamData,
+                        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                }
+            }
+            
+            // Создаем глобальные уведомления
+            const globalNotifications = ServerStorage.getGlobalNotifications();
+            for (const notification of globalNotifications) {
+                await firestore.collection('global_notifications').add({
+                    ...notification,
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+            }
+            
+            console.log('Начальные данные созданы в Firebase');
+        }
+    } catch (error) {
+        console.error('Ошибка инициализации Firebase данных:', error);
+    }
+}
