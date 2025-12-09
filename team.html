@@ -1,0 +1,822 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Хортинг - Команда</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body class="team-page">
+    <div class="container">
+        <div class="team-header">
+            <div>
+                <h1 id="teamName">Команда</h1>
+                <p id="userRole">Роль: Завантаження...</p>
+            </div>
+            <div class="user-info">
+                <div id="adminViewControls" style="display: none;">
+                    <button class="btn-secondary" onclick="exitViewMode()" style="margin-bottom: 10px;">
+                        <i class="fas fa-arrow-left"></i> Назад до адмін-панелі
+                    </button>
+                </div>
+                <p id="userInfo"></p>
+                <button class="logout-btn" onclick="logout()">
+                    <i class="fas fa-sign-out-alt"></i> Вийти
+                </button>
+            </div>
+        </div>
+
+        <div class="tabs">
+            <button class="tab-btn active" onclick="showTab('main')">
+                <i class="fas fa-home"></i> Головна
+            </button>
+            <button class="tab-btn" onclick="showTab('members')">
+                <i class="fas fa-users"></i> Склад команди
+            </button>
+            <button class="tab-btn" onclick="showTab('notifications')">
+                <i class="fas fa-bell"></i> Сповіщення
+            </button>
+            <button class="tab-btn" onclick="showTab('tasks')">
+                <i class="fas fa-tasks"></i> Завдання
+            </button>
+            <button class="tab-btn" onclick="showTab('absence')">
+                <i class="fas fa-calendar-times"></i> Відсутність
+            </button>
+        </div>
+
+        <main>
+            <!-- Вкладка Главная -->
+            <div id="mainTab" class="tab-content active">
+                <div class="section">
+                    <h3><i class="fas fa-bullhorn"></i> Загальні сповіщення</h3>
+                    <div id="globalNotificationsTeam"></div>
+                </div>
+                
+                <div class="section">
+                    <h3><i class="fas fa-users"></i> Сповіщення команди</h3>
+                    <div id="teamNotifications"></div>
+                    <div id="addNotificationSection" style="display: none; margin-top: 20px;">
+                        <button class="btn-primary" onclick="showAddNotificationForm()">
+                            <i class="fas fa-plus"></i> Додати сповіщення
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="section">
+                    <h3><i class="fas fa-dumbbell"></i> Найближчі заняття</h3>
+                    <div id="nextTrainings"></div>
+                </div>
+            </div>
+
+            <!-- Вкладка Состав -->
+            <div id="membersTab" class="tab-content" style="display: none;">
+                <div class="section">
+                    <h3><i class="fas fa-users"></i> Склад команди</h3>
+                    <div id="membersList"></div>
+                    <div id="addMemberSection" style="display: none; margin-top: 20px;">
+                        <button class="btn-primary" onclick="showAddMemberForm()">
+                            <i class="fas fa-user-plus"></i> Додати члена команди
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Вкладка Уведомления -->
+            <div id="notificationsTab" class="tab-content" style="display: none;">
+                <div class="section">
+                    <h3><i class="fas fa-bell"></i> Всі сповіщення команди</h3>
+                    <div id="allTeamNotifications"></div>
+                </div>
+            </div>
+
+            <!-- Вкладка Задачи -->
+            <div id="tasksTab" class="tab-content" style="display: none;">
+                <div class="section">
+                    <h3><i class="fas fa-tasks"></i> Завдання команди</h3>
+                    <div id="tasksList"></div>
+                    <div id="addTaskSection" style="display: none; margin-top: 20px;">
+                        <button class="btn-primary" onclick="showAddTaskForm()">
+                            <i class="fas fa-plus"></i> Додати завдання
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Вкладка Отсутствие и Обращения -->
+            <div id="absenceTab" class="tab-content" style="display: none;">
+                <div class="section">
+                    <h3><i class="fas fa-calendar-times"></i> Повідомити про відсутність</h3>
+                    <div class="enhanced-card">
+                        <p style="color: #ff9e00; margin-bottom: 15px;">
+                            <i class="fas fa-exclamation-triangle"></i>
+                            <strong>Увага:</strong> Повідомлення автоматично видаляється в день відсутності о 23:59
+                        </p>
+                        <div class="form-row">
+                            <div>
+                                <label style="display: block; margin-bottom: 8px; color: #e0e1dd;">Ваше ім'я</label>
+                                <input type="text" class="enhanced-input" id="absenceName" placeholder="Ваше ім'я">
+                            </div>
+                            <div>
+                                <label style="display: block; margin-bottom: 8px; color: #e0e1dd;">Дата відсутності</label>
+                                <input type="date" class="enhanced-input" id="absenceDate">
+                            </div>
+                            <div>
+                                <label style="display: block; margin-bottom: 8px; color: #e0e1dd;">Причина</label>
+                                <select class="enhanced-select" id="absenceReason">
+                                    <option value="хвороба">Хвороба</option>
+                                    <option value="сімейні обставини">Сімейні обставини</option>
+                                    <option value="навчання">Навчання</option>
+                                    <option value="інше">Інша причина</option>
+                                </select>
+                            </div>
+                        </div>
+                        <button class="btn-primary" onclick="reportAbsence()" style="margin-top: 20px; width: 100%;">
+                            <i class="fas fa-paper-plane"></i> Надіслати командиру
+                        </button>
+                    </div>
+                    
+                    <h3 style="margin-top: 30px;"><i class="fas fa-list"></i> Заплановані відсутності</h3>
+                    <div id="absencesList"></div>
+                </div>
+                
+                <div class="section">
+                    <h3><i class="fas fa-headset"></i> Звернення до адміністратора</h3>
+                    <div class="enhanced-card">
+                        <p style="margin-bottom: 15px; color: rgba(255,255,255,0.8);">
+                            Тут ви можете звернутися до адміністратора системи
+                        </p>
+                        <div class="form-row">
+                            <div style="grid-column: 1 / -1;">
+                                <label style="display: block; margin-bottom: 8px; color: #e0e1dd;">Повідомлення</label>
+                                <textarea class="enhanced-textarea" id="adminMessage" placeholder="Ваше повідомлення адміністратору..." rows="3"></textarea>
+                            </div>
+                            <div>
+                                <label style="display: block; margin-bottom: 8px; color: #e0e1dd;">Тип звернення</label>
+                                <select class="enhanced-select" id="messageType">
+                                    <option value="проблема">Проблема з сайтом</option>
+                                    <option value="питання">Запитання</option>
+                                    <option value="пропозиція">Пропозиція</option>
+                                    <option value="інше">Інше</option>
+                                </select>
+                            </div>
+                        </div>
+                        <button class="btn-primary" onclick="sendAdminMessage()" style="margin-top: 20px; width: 100%;">
+                            <i class="fas fa-paper-plane"></i> Надіслати адміністратору
+                        </button>
+                    </div>
+                    
+                    <h3 style="margin-top: 30px;"><i class="fas fa-history"></i> Мої звернення</h3>
+                    <div id="myMessagesList"></div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="script.js"></script>
+    <script>
+        let currentUser = null;
+        let currentTeam = null;
+        let canEdit = false;
+        let isAdminView = false;
+
+        // Инициализация
+        function initTeamPage() {
+            // Проверяем, не админ ли это просматривает команду
+            const adminView = sessionStorage.getItem('horting_admin_view');
+            const viewTeam = sessionStorage.getItem('horting_view_team');
+            
+            if (adminView === 'true' && viewTeam) {
+                // Админ просматривает команду
+                isAdminView = true;
+                currentUser = {
+                    role: 'admin_view',
+                    teamId: parseInt(viewTeam),
+                    isCommander: true,
+                    isDeputy: true,
+                    teamType: viewTeam <= 3 ? 'mal' : 'str'
+                };
+                canEdit = true; // Админ может редактировать в режиме просмотра
+                
+                // Показываем кнопку возврата
+                document.getElementById('adminViewControls').style.display = 'block';
+                
+                document.getElementById('userInfo').textContent = 
+                    `Перегляд команди ${viewTeam}`;
+                document.getElementById('userRole').innerHTML = 
+                    `<span style="color: #29c4ff;"><i class="fas fa-eye"></i> Режим перегляду адміна</span>`;
+                    
+            } else {
+                // Обычный пользователь
+                isAdminView = false;
+                currentUser = checkAuth();
+                if (!currentUser) return;
+                
+                if (currentUser.role === 'admin') {
+                    window.location.href = 'dashboard.html';
+                    return;
+                }
+                
+                if (!currentUser.teamId) {
+                    logout();
+                    return;
+                }
+                
+                canEdit = currentUser.isCommander || currentUser.isDeputy;
+                
+                document.getElementById('userInfo').textContent = 
+                    `Команда ${currentUser.teamId} (${currentUser.teamType === 'mal' ? 'молодші' : 'старші'})`;
+                document.getElementById('userRole').textContent = 
+                    `Роль: ${currentUser.isCommander ? 'Командир' : 
+                            currentUser.isDeputy ? 'Заступник' : 'Боець'}`;
+            }
+            
+            // Загружаем данные команды
+            loadTeamData();
+            
+            // Показываем/скрываем элементы управления
+            if (canEdit) {
+                document.getElementById('addNotificationSection').style.display = 'block';
+                document.getElementById('addMemberSection').style.display = 'block';
+                document.getElementById('addTaskSection').style.display = 'block';
+            }
+            
+            // Загружаем тренировки
+            loadNextTrainings();
+            // Загружаем обращения
+            loadMyMessages();
+            
+            // Устанавливаем завтрашнюю дату по умолчанию
+            const tomorrow = new Date();
+            tomorrow.setDate(tomorrow.getDate() + 1);
+            document.getElementById('absenceDate').valueAsDate = tomorrow;
+            
+            // Устанавливаем имя из данных пользователя
+            if (!isAdminView) {
+                const team = TeamManager.getTeam(currentUser.teamId);
+                const member = team.members.find(m => m.callSign.includes('Командир') || m.callSign.includes('Заступник') || m.callSign);
+                if (member) {
+                    document.getElementById('absenceName').value = member.name;
+                }
+            }
+            
+            document.getElementById('teamName').textContent = 
+                CONFIG.teams[currentUser.teamId].name;
+        }
+
+        function loadTeamData() {
+            currentTeam = TeamManager.getTeam(currentUser.teamId);
+            
+            loadTeamMembers();
+            loadTeamNotifications();
+            loadAllTeamNotifications();
+            loadGlobalNotificationsForTeam();
+            loadTasks();
+            loadAbsences();
+        }
+
+        function loadTeamMembers() {
+            const container = document.getElementById('membersList');
+            
+            if (!currentTeam.members.length) {
+                container.innerHTML = '<p style="color: rgba(255,255,255,0.5); text-align: center;">Ще немає членів команди</p>';
+                return;
+            }
+            
+            container.innerHTML = currentTeam.members.map(member => `
+                <div class="enhanced-card" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                    <div>
+                        <strong style="color: #29c4ff; font-size: 1.1rem;">${member.callSign}</strong>
+                        <p style="margin: 5px 0; color: rgba(255,255,255,0.8);">${member.name}</p>
+                        <small style="color: rgba(255,255,255,0.5);">${member.rank}</small>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 10px;">
+                        <span class="role-badge ${member.role === 'command' ? 'role-kam' : 
+                                                  member.role === 'deputy' ? 'role-zam' : ''}">
+                            ${member.role === 'command' ? 'Командир' : 
+                             member.role === 'deputy' ? 'Заступник' : 'Боець'}
+                        </span>
+                        ${canEdit ? `
+                            <button onclick="removeMember('${member.id}')" 
+                                    class="btn-secondary" 
+                                    style="padding: 6px 12px; font-size: 0.8rem; background: rgba(255,107,107,0.2); border-color: #ff6b6b; color: #ff6b6b;">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        ` : ''}
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function loadTeamNotifications() {
+            const container = document.getElementById('teamNotifications');
+            const recent = currentTeam.notifications.slice(-5).reverse();
+            
+            if (!recent.length) {
+                container.innerHTML = '<p style="color: rgba(255,255,255,0.5); text-align: center;">Ще немає сповіщень</p>';
+                return;
+            }
+            
+            container.innerHTML = recent.map(notif => `
+                <div class="enhanced-card">
+                    <strong style="color: #29c4ff; font-size: 1.1rem;">${notif.title}</strong>
+                    <p style="margin: 10px 0; color: rgba(255,255,255,0.8);">${notif.message}</p>
+                    <div style="color: rgba(255,255,255,0.5); font-size: 0.9rem; margin-top: 10px;">
+                        <i class="fas fa-calendar"></i> ${formatDate(notif.date).split(' ')[0]} • 
+                        <i class="fas fa-user"></i> ${notif.author}
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function loadAllTeamNotifications() {
+            const container = document.getElementById('allTeamNotifications');
+            const all = [...currentTeam.notifications].reverse();
+            
+            if (!all.length) {
+                container.innerHTML = '<p style="color: rgba(255,255,255,0.5); text-align: center;">Ще немає сповіщень</p>';
+                return;
+            }
+            
+            container.innerHTML = all.map(notif => `
+                <div class="enhanced-card">
+                    <div style="display: flex; justify-content: space-between; align-items: start;">
+                        <div style="flex: 1;">
+                            <strong style="color: #29c4ff; font-size: 1.1rem;">${notif.title}</strong>
+                            <p style="margin: 10px 0; color: rgba(255,255,255,0.8);">${notif.message}</p>
+                            <div style="color: rgba(255,255,255,0.5); font-size: 0.9rem; margin-top: 10px;">
+                                <i class="fas fa-calendar"></i> ${formatDate(notif.date).split(' ')[0]} • 
+                                <i class="fas fa-user"></i> ${notif.author}
+                            </div>
+                        </div>
+                        ${canEdit ? `
+                            <div>
+                                <button onclick="deleteNotification('${notif.id}')" 
+                                        class="btn-secondary" 
+                                        style="padding: 6px 12px; font-size: 0.8rem; background: rgba(255,107,107,0.2); border-color: #ff6b6b; color: #ff6b6b;">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </div>
+                        ` : ''}
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function loadGlobalNotificationsForTeam() {
+            const allNotifications = TeamManager.getGlobalNotifications();
+            const container = document.getElementById('globalNotificationsTeam');
+            
+            // Фильтруем уведомления для этой команды
+            const teamNotifications = allNotifications.filter(notif => 
+                !notif.targetTeams || notif.targetTeams.includes(currentUser.teamId.toString())
+            );
+            
+            const recent = teamNotifications.slice(-3).reverse();
+            
+            if (!recent.length) {
+                container.innerHTML = '<p style="color: rgba(255,255,255,0.5); text-align: center;">Немає загальних сповіщень</p>';
+                return;
+            }
+            
+            container.innerHTML = recent.map(notif => `
+                <div class="enhanced-card" style="border-left: 4px solid #29c4ff;">
+                    <strong style="color: #29c4ff; font-size: 1.1rem;">${notif.title}</strong>
+                    <p style="margin: 10px 0; color: rgba(255,255,255,0.8);">${notif.message}</p>
+                    <div style="color: rgba(255,255,255,0.5); font-size: 0.9rem; margin-top: 10px;">
+                        <i class="fas fa-calendar"></i> ${formatDate(notif.date).split(' ')[0]} • 
+                        <i class="fas fa-user"></i> ${notif.author}
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function loadTasks() {
+            const container = document.getElementById('tasksList');
+            const tasks = currentTeam.tasks;
+            
+            if (!tasks.length) {
+                container.innerHTML = '<p style="color: rgba(255,255,255,0.5); text-align: center;">Ще немає завдань</p>';
+                return;
+            }
+            
+            container.innerHTML = tasks.map(task => `
+                <div class="enhanced-card" style="border-left: 4px solid ${task.completed ? '#1a936f' : '#ff9e00'}">
+                    <div style="display: flex; justify-content: space-between; align-items: start;">
+                        <div style="flex: 1;">
+                            <strong style="color: ${task.completed ? '#1a936f' : '#29c4ff'}; font-size: 1.1rem;">
+                                ${task.title}
+                            </strong>
+                            <p style="margin: 10px 0; color: rgba(255,255,255,0.8);">${task.description}</p>
+                            <div style="color: rgba(255,255,255,0.5); font-size: 0.9rem; margin-top: 10px;">
+                                <i class="fas fa-calendar"></i> ${formatDate(task.date).split(' ')[0]}
+                            </div>
+                        </div>
+                        ${canEdit ? `
+                            <div style="display: flex; flex-direction: column; gap: 5px;">
+                                <button onclick="toggleTask('${task.id}')" 
+                                        class="${task.completed ? 'btn-secondary' : 'btn-primary'}" 
+                                        style="padding: 6px 12px; font-size: 0.8rem; white-space: nowrap;">
+                                    <i class="fas ${task.completed ? 'fa-redo' : 'fa-check'}"></i>
+                                    ${task.completed ? 'Відновити' : 'Виконано'}
+                                </button>
+                                <button onclick="deleteTask('${task.id}')" 
+                                        class="btn-secondary" 
+                                        style="padding: 6px 12px; font-size: 0.8rem; background: rgba(255,107,107,0.2); border-color: #ff6b6b; color: #ff6b6b;">
+                                    <i class="fas fa-trash"></i> Видалити
+                                </button>
+                            </div>
+                        ` : ''}
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function loadAbsences() {
+            const container = document.getElementById('absencesList');
+            const absences = currentTeam.absences;
+            
+            if (!absences.length) {
+                container.innerHTML = '<p style="color: rgba(255,255,255,0.5); text-align: center;">Немає запланованих відсутностей</p>';
+                return;
+            }
+            
+            container.innerHTML = absences.map(abs => `
+                <div class="enhanced-card" style="border-left: 4px solid #ff6b6b;">
+                    <div style="display: flex; justify-content: space-between; align-items: start;">
+                        <div style="flex: 1;">
+                            <strong style="color: #ff6b6b; font-size: 1.1rem;">${abs.memberName}</strong>
+                            <p style="margin: 5px 0; color: rgba(255,255,255,0.8);">Не буде: ${abs.date}</p>
+                            <small style="color: rgba(255,255,255,0.5);">Причина: ${abs.reason}</small>
+                        </div>
+                        ${canEdit ? `
+                            <div>
+                                <button onclick="deleteAbsence('${abs.id}')" 
+                                        class="btn-secondary" 
+                                        style="padding: 6px 12px; font-size: 0.8rem; background: rgba(255,107,107,0.2); border-color: #ff6b6b; color: #ff6b6b;">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </div>
+                        ` : ''}
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function loadMyMessages() {
+            const container = document.getElementById('myMessagesList');
+            const notifications = TeamManager.getAdminNotifications();
+            
+            // Фильтруем сообщения от этой команды
+            const myMessages = notifications.filter(n => n.fromTeam == currentUser.teamId);
+            
+            if (!myMessages.length) {
+                container.innerHTML = '<p style="color: rgba(255,255,255,0.5); text-align: center;">Ви ще не надсилали звернень</p>';
+                return;
+            }
+            
+            container.innerHTML = myMessages.reverse().map(msg => `
+                <div class="enhanced-card" style="border-left: 4px solid #9d4edd;">
+                    <strong style="color: #9d4edd; font-size: 1.1rem;">
+                        ${msg.message.split(']')[0]}]
+                    </strong>
+                    <p style="margin: 10px 0; color: rgba(255,255,255,0.8);">${msg.message.split('] ')[1] || msg.message}</p>
+                    <div style="color: rgba(255,255,255,0.5); font-size: 0.9rem; margin-top: 10px;">
+                        <i class="fas fa-calendar"></i> ${formatDate(msg.date).split(' ')[0]}
+                        ${msg.read ? 
+                            '<span style="color: #1a936f; margin-left: 10px;"><i class="fas fa-check"></i> Прочитано</span>' : 
+                            '<span style="color: #ff9e00; margin-left: 10px;"><i class="fas fa-clock"></i> Очікує розгляду</span>'
+                        }
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function loadNextTrainings() {
+            const container = document.getElementById('nextTrainings');
+            const trainings = getNextTrainings(3);
+            
+            if (!trainings.length) {
+                container.innerHTML = '<p style="color: rgba(255,255,255,0.5); text-align: center;">Немає запланованих занять</p>';
+                return;
+            }
+            
+            container.innerHTML = trainings.map(training => `
+                <div class="enhanced-card" style="border-left: 4px solid #00bbf9;">
+                    <strong style="color: #00bbf9; font-size: 1.1rem;">
+                        ${training.day.charAt(0).toUpperCase() + training.day.slice(1)}
+                    </strong>
+                    <p style="margin: 10px 0; color: rgba(255,255,255,0.8);">Дата: ${training.date}</p>
+                    <div style="color: rgba(255,255,255,0.5); font-size: 0.9rem; margin-top: 10px;">
+                        ${training.isToday ? 
+                            '<span style="color: #ffd60a; font-weight: bold;"><i class="fas fa-star"></i> Сьогодні</span>' : 
+                            '<span><i class="fas fa-clock"></i> ' + training.time + '</span>'
+                        }
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // Отправка сообщения админу
+        async function sendAdminMessage() {
+            const message = document.getElementById('adminMessage').value.trim();
+            const type = document.getElementById('messageType').value;
+            
+            if (!message) {
+                alert('Введіть текст повідомлення!');
+                return;
+            }
+            
+            const fullMessage = `[${type.toUpperCase()}] ${message}`;
+            
+            sendToAdmin(fullMessage, currentUser.teamId);
+            
+            // Также сохраняем в локальные уведомления команды
+            TeamManager.addTeamNotification(
+                currentUser.teamId,
+                {
+                    title: 'Звернення до адміна відправлено',
+                    message: `Тип: ${type}. ${message.substring(0, 50)}...`
+                },
+                'Система'
+            );
+            
+            document.getElementById('adminMessage').value = '';
+            alert('Повідомлення адміністратору відправлено!');
+            loadMyMessages();
+            loadTeamData();
+        }
+
+        // Показать форму добавления участника
+        async function showAddMemberForm() {
+            if (!canEdit) return;
+            
+            const result = await Modal.showForm('Додати члена команди', [
+                {
+                    label: 'Повне ім\'я',
+                    name: 'name',
+                    type: 'text',
+                    placeholder: 'Іван Іванов',
+                    required: true
+                },
+                {
+                    label: 'Позивний',
+                    name: 'callSign',
+                    type: 'text',
+                    placeholder: 'Вовк',
+                    required: true
+                },
+                {
+                    label: 'Звання',
+                    name: 'rank',
+                    type: 'text',
+                    placeholder: 'Сержант',
+                    required: true
+                },
+                {
+                    label: 'Роль',
+                    name: 'role',
+                    type: 'select',
+                    options: [
+                        { value: 'soldier', text: 'Боець' },
+                        { value: 'deputy', text: 'Заступник командира' },
+                        { value: 'command', text: 'Командир' }
+                    ],
+                    required: true
+                }
+            ]);
+            
+            if (result) {
+                TeamManager.addMember(currentUser.teamId, {
+                    name: result.name,
+                    callSign: result.callSign,
+                    rank: result.rank,
+                    role: result.role
+                });
+                
+                loadTeamData();
+                alert('Члена команди успішно додано!');
+            }
+        }
+
+        function removeMember(memberId) {
+            if (!canEdit || !confirm('Видалити цього члена команди?')) return;
+            
+            TeamManager.removeMember(currentUser.teamId, memberId);
+            loadTeamData();
+        }
+
+        // Показать форму добавления уведомления
+        async function showAddNotificationForm() {
+            if (!canEdit) return;
+            
+            const result = await Modal.showForm('Додати сповіщення', [
+                {
+                    label: 'Заголовок',
+                    name: 'title',
+                    type: 'text',
+                    placeholder: 'Важлива інформація',
+                    required: true
+                },
+                {
+                    label: 'Текст сповіщення',
+                    name: 'message',
+                    type: 'textarea',
+                    placeholder: 'Текст вашого сповіщення...',
+                    rows: 4,
+                    required: true
+                }
+            ]);
+            
+            if (result) {
+                TeamManager.addTeamNotification(
+                    currentUser.teamId, 
+                    { 
+                        title: result.title, 
+                        message: result.message 
+                    },
+                    currentUser.isCommander ? 'Командир' : 
+                    currentUser.isDeputy ? 'Заступник' : 'Адміністратор'
+                );
+                
+                loadTeamData();
+                alert('Сповіщення успішно додано!');
+            }
+        }
+
+        function deleteNotification(notificationId) {
+            if (!canEdit || !confirm('Видалити це сповіщення?')) return;
+            
+            currentTeam.notifications = currentTeam.notifications.filter(n => n.id !== notificationId);
+            TeamManager.saveTeam(currentUser.teamId, currentTeam);
+            loadTeamData();
+        }
+
+        // Показать форму добавления задачи
+        async function showAddTaskForm() {
+            if (!canEdit) return;
+            
+            const result = await Modal.showForm('Додати завдання', [
+                {
+                    label: 'Назва завдання',
+                    name: 'title',
+                    type: 'text',
+                    placeholder: 'Назва завдання',
+                    required: true
+                },
+                {
+                    label: 'Опис завдання',
+                    name: 'description',
+                    type: 'textarea',
+                    placeholder: 'Детальний опис завдання...',
+                    rows: 3,
+                    required: true
+                }
+            ]);
+            
+            if (result) {
+                TeamManager.addTask(currentUser.teamId, {
+                    title: result.title,
+                    description: result.description
+                });
+                
+                loadTeamData();
+                alert('Завдання успішно додано!');
+            }
+        }
+
+        function toggleTask(taskId) {
+            if (!canEdit) return;
+            
+            const task = currentTeam.tasks.find(t => t.id === taskId);
+            if (task) {
+                task.completed = !task.completed;
+                TeamManager.saveTeam(currentUser.teamId, currentTeam);
+                loadTasks();
+            }
+        }
+
+        function deleteTask(taskId) {
+            if (!canEdit || !confirm('Видалити це завдання?')) return;
+            
+            currentTeam.tasks = currentTeam.tasks.filter(t => t.id !== taskId);
+            TeamManager.saveTeam(currentUser.teamId, currentTeam);
+            loadTasks();
+        }
+
+        async function reportAbsence() {
+            const name = document.getElementById('absenceName').value.trim();
+            const date = document.getElementById('absenceDate').value;
+            const reason = document.getElementById('absenceReason').value;
+            
+            if (!name || !date || !reason) {
+                alert('Заповніть всі поля!');
+                return;
+            }
+            
+            // Проверка формата даты
+            const dateObj = new Date(date);
+            if (isNaN(dateObj.getTime())) {
+                alert('Невірна дата!');
+                return;
+            }
+            
+            // Проверяем, не является ли дата днем занятия
+            if (isTrainingDay(dateObj)) {
+                const dayNames = ['неділя', 'понеділок', 'вівторок', 'середа', 'четвер', 'п\'ятниця', 'субота'];
+                const dayName = dayNames[dateObj.getDay()];
+                
+                const confirmMsg = await Modal.show(
+                    'Підтвердження',
+                    `<p style="color: #ff9e00;"><strong>Увага!</strong></p>
+                     <p>${date} - це день заняття (${dayName}).</p>
+                     <p>Все одно відправити повідомлення про відсутність?</p>`,
+                    [
+                        { text: 'Скасувати', class: 'secondary', value: 'cancel' },
+                        { text: 'Відправити', class: '', value: 'send' }
+                    ]
+                );
+                
+                if (confirmMsg !== 'send') {
+                    return;
+                }
+            }
+            
+            TeamManager.addAbsence(currentUser.teamId, {
+                memberName: name,
+                date: date,
+                reason: reason
+            });
+            
+            // Отправляем уведомление админу
+            sendToAdmin(
+                `ВІДСУТНІСТЬ: ${name} не буде на заняттях ${date}. Причина: ${reason}. Команда: ${currentUser.teamId}`,
+                currentUser.teamId
+            );
+            
+            // Отправляем уведомление командиру (если пользователь не командир)
+            if (!currentUser.isCommander && !currentUser.isDeputy) {
+                TeamManager.addTeamNotification(
+                    currentUser.teamId,
+                    {
+                        title: 'Повідомлення про відсутність',
+                        message: `${name} не буде ${date}. Причина: ${reason}`
+                    },
+                    'Система'
+                );
+            }
+            
+            document.getElementById('absenceName').value = '';
+            document.getElementById('absenceDate').value = '';
+            
+            loadTeamData();
+            loadMyMessages();
+            
+            Modal.show(
+                'Успішно!',
+                `<p>Повідомлення відправлено!</p>
+                 <p>Воно буде автоматично видалено ${date} о 23:59.</p>`,
+                [{ text: 'OK', class: '', value: 'ok' }]
+            );
+        }
+
+        function deleteAbsence(absenceId) {
+            if (!canEdit || !confirm('Видалити запис про відсутність?')) return;
+            
+            currentTeam.absences = currentTeam.absences.filter(a => a.id !== absenceId);
+            TeamManager.saveTeam(currentUser.teamId, currentTeam);
+            loadAbsences();
+        }
+
+        function showTab(tabName) {
+            // Скрыть все табы
+            document.querySelectorAll('.tab-content').forEach(tab => {
+                tab.style.display = 'none';
+            });
+            
+            // Убрать активный класс со всех кнопок
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            
+            // Показать выбранный таб
+            document.getElementById(tabName + 'Tab').style.display = 'block';
+            
+            // Активировать кнопку
+            event.target.classList.add('active');
+            
+            // Обновляем данные если нужно
+            if (tabName === 'tasks') loadTasks();
+            if (tabName === 'absence') {
+                loadAbsences();
+                loadMyMessages();
+            }
+            if (tabName === 'notifications') loadAllTeamNotifications();
+            if (tabName === 'members') loadTeamMembers();
+        }
+
+        // Инициализация при загрузке
+        document.addEventListener('DOMContentLoaded', initTeamPage);
+    </script>
+</body>
+</html>
