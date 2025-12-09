@@ -10,13 +10,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
-    <!-- Firebase SDK -->
-    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
-    
     <style>
-        /* Дополнительные стили для индикатора синхронизации */
         .sync-status {
             position: fixed;
             top: 20px;
@@ -60,7 +54,6 @@
             100% { transform: rotate(360deg); }
         }
         
-        /* Стили для офлайн режима */
         .offline-overlay {
             display: none;
             position: fixed;
@@ -93,6 +86,55 @@
             0%, 100% { opacity: 1; }
             50% { opacity: 0.5; }
         }
+        
+        .login-container {
+            width: 100%;
+            max-width: 440px;
+            margin: 0 auto;
+        }
+        
+        .input-group {
+            margin-bottom: 20px;
+        }
+        
+        .form-actions {
+            margin-top: 25px;
+        }
+        
+        .quick-login {
+            margin-top: 25px;
+            padding: 20px;
+            background: rgba(157, 78, 221, 0.1);
+            border-radius: 16px;
+            border-left: 4px solid #9d4edd;
+        }
+        
+        .quick-btn {
+            flex: 1;
+            min-width: 80px;
+            padding: 10px 15px;
+            background: rgba(157, 78, 221, 0.2);
+            border: 1px solid #9d4edd;
+            border-radius: 8px;
+            color: white;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .quick-btn:hover {
+            background: rgba(157, 78, 221, 0.3);
+            transform: translateY(-2px);
+        }
+        
+        .firebase-status {
+            margin-top: 10px;
+            padding: 10px;
+            border-radius: 8px;
+            background: rgba(41, 196, 255, 0.1);
+            border: 1px solid rgba(41, 196, 255, 0.2);
+        }
     </style>
 </head>
 <body class="login-page">
@@ -108,9 +150,12 @@
             <i class="fas fa-wifi-slash"></i>
         </div>
         <h2 style="color: #ff6b6b; margin-bottom: 10px;">Офлайн режим</h2>
-        <p style="color: rgba(255, 255, 255, 0.7); max-width: 400px; margin-bottom: 20px;">
-            Немає підключення до інтернету. Використовуються локальні дані.
-            Зміни зберігаться локально та синхронізуються, коли з'явиться з'єднання.
+        <p style="color: rgba(255, 255, 255, 0.7); max-width: 400px; margin-bottom: 20px; line-height: 1.5;">
+            <strong>Увага!</strong><br>
+            Немає підключення до інтернету.<br>
+            Використовуються локальні дані.<br>
+            Зміни зберігатимуться локально та синхронізуються,<br>
+            коли з'явиться з'єднання.
         </p>
         <button class="btn-primary" onclick="hideOfflineOverlay()" style="padding: 12px 24px;">
             <i class="fas fa-check"></i> Продовжити роботу
@@ -131,9 +176,9 @@
                     <h1>Хортинг</h1>
                 </div>
                 <p class="tagline">Військово-патріотична спільнота</p>
-                <div id="firebaseStatus" style="margin-top: 10px;">
-                    <small style="color: rgba(255, 255, 255, 0.5);">
-                        <i class="fas fa-cloud"></i> Хмарне зберігання даних
+                <div id="firebaseStatus" class="firebase-status">
+                    <small style="color: rgba(255, 255, 255, 0.7);">
+                        <i class="fas fa-sync-alt fa-spin"></i> Завантаження системи...
                     </small>
                 </div>
             </div>
@@ -178,24 +223,39 @@
                     </div>
                     
                     <!-- Быстрый вход для тестирования -->
-                    <div class="quick-login" style="margin-top: 20px; padding: 15px; background: rgba(157, 78, 221, 0.1); border-radius: 12px; border-left: 4px solid #9d4edd;">
-                        <h4 style="color: #9d4edd; font-size: 14px; margin-bottom: 10px; display: flex; align-items: center; gap: 8px;">
+                    <div class="quick-login">
+                        <h4 style="color: #9d4edd; font-size: 14px; margin-bottom: 15px; display: flex; align-items: center; gap: 8px;">
                             <i class="fas fa-bolt"></i> Швидкий вхід (для тесту)
                         </h4>
-                        <div style="display: flex; flex-wrap: wrap; gap: 8px;">
-                            <button class="quick-btn" onclick="quickLogin('kyka7')" style="flex: 1; min-width: 80px; padding: 8px 12px; background: rgba(157, 78, 221, 0.2); border: 1px solid #9d4edd; border-radius: 6px; color: white; font-size: 12px; cursor: pointer;">
-                                Адмін
+                        <div style="display: flex; flex-wrap: wrap; gap: 10px;">
+                            <button class="quick-btn" onclick="quickLogin('kyka7')" style="background: rgba(157, 78, 221, 0.2); border-color: #9d4edd;">
+                                Адмін (kyka7)
                             </button>
-                            <button class="quick-btn" onclick="quickLogin('mal1kab123_kam')" style="flex: 1; min-width: 80px; padding: 8px 12px; background: rgba(255, 107, 107, 0.2); border: 1px solid #ff6b6b; border-radius: 6px; color: white; font-size: 12px; cursor: pointer;">
-                                Ком. 1
+                            <button class="quick-btn" onclick="quickLogin('mal1kab123_kam')" style="background: rgba(255, 107, 107, 0.2); border-color: #ff6b6b;">
+                                Ком. 1 команди
                             </button>
-                            <button class="quick-btn" onclick="quickLogin('str4kab456_zam')" style="flex: 1; min-width: 80px; padding: 8px 12px; background: rgba(41, 196, 255, 0.2); border: 1px solid #29c4ff; border-radius: 6px; color: white; font-size: 12px; cursor: pointer;">
-                                Зам. 4
+                            <button class="quick-btn" onclick="quickLogin('str4kab456_zam')" style="background: rgba(41, 196, 255, 0.2); border-color: #29c4ff;">
+                                Зам. 4 команди
                             </button>
-                            <button class="quick-btn" onclick="quickLogin('mal2kab777')" style="flex: 1; min-width: 80px; padding: 8px 12px; background: rgba(255, 214, 10, 0.2); border: 1px solid #ffd60a; border-radius: 6px; color: white; font-size: 12px; cursor: pointer;">
-                                Боець 2
+                            <button class="quick-btn" onclick="quickLogin('mal2kab777')" style="background: rgba(255, 214, 10, 0.2); border-color: #ffd60a;">
+                                Боець 2 команди
                             </button>
                         </div>
+                        <p style="margin-top: 15px; color: rgba(255, 255, 255, 0.5); font-size: 12px;">
+                            Формат паролів: mal1kab123_kam, str4kab456_zam, mal2kab777
+                        </p>
+                    </div>
+                    
+                    <!-- Расписание занятий -->
+                    <div style="margin-top: 25px; padding: 15px; background: rgba(41, 196, 255, 0.1); border-radius: 12px; border-left: 4px solid #29c4ff;">
+                        <h4 style="color: #29c4ff; font-size: 14px; margin-bottom: 10px; display: flex; align-items: center; gap: 8px;">
+                            <i class="fas fa-calendar-alt"></i> Розклад занять
+                        </h4>
+                        <ul style="color: rgba(255, 255, 255, 0.8); font-size: 13px; margin: 0; padding-left: 20px;">
+                            <li><strong>Понеділок:</strong> 16:00 - 19:00</li>
+                            <li><strong>Середа:</strong> 16:00 - 19:00</li>
+                            <li><strong>Субота:</strong> 12:00 - 16:00</li>
+                        </ul>
                     </div>
                 </div>
             </div>
@@ -204,141 +264,20 @@
             <footer>
                 <p>© 2024 Хортинг. Лише для авторизованих користувачів</p>
                 <div id="firebaseInfo" style="margin-top: 10px; font-size: 12px; color: rgba(255, 255, 255, 0.4);">
-                    <i class="fas fa-database"></i> Дані зберігаються в хмарі
+                    <i class="fas fa-database"></i> Система зберігання даних
                 </div>
             </footer>
         </div>
     </div>
 
-    <!-- Firebase конфигурация и инициализация -->
-    <script>
-        // Конфигурация Firebase (замените на свои данные)
-        const firebaseConfig = {
-            apiKey: "AIzaSyD...YOUR_API_KEY...",
-            authDomain: "horting-system.firebaseapp.com",
-            projectId: "horting-system",
-            storageBucket: "horting-system.appspot.com",
-            messagingSenderId: "123456789012",
-            appId: "1:123456789012:web:abcdef1234567890"
-        };
-
-        // Инициализация Firebase
-        let firebaseApp, firestore, auth;
-        
-        try {
-            // Инициализируем Firebase
-            firebaseApp = firebase.initializeApp(firebaseConfig);
-            firestore = firebase.firestore(firebaseApp);
-            auth = firebase.auth(firebaseApp);
-            
-            console.log('Firebase инициализирован');
-            
-            // Включаем офлайн поддержку
-            firestore.enablePersistence()
-                .then(() => {
-                    console.log('Офлайн поддержка включена');
-                    updateSyncStatus('online');
-                })
-                .catch((err) => {
-                    console.warn('Офлайн поддержка не доступна:', err);
-                    updateSyncStatus('online');
-                });
-            
-            // Слушаем изменения состояния сети
-            firestore.onSnapshotsInSync(() => {
-                updateSyncStatus('online');
-            });
-            
-        } catch (error) {
-            console.error('Ошибка инициализации Firebase:', error);
-            updateSyncStatus('offline');
-            showOfflineOverlay();
-        }
-
-        // Глобальные переменные для доступа
-        window.firebaseApp = firebaseApp;
-        window.firestore = firestore;
-        window.auth = auth;
-
-        // Обновление статуса синхронизации
-        function updateSyncStatus(status) {
-            const syncElement = document.getElementById('syncStatus');
-            const firebaseInfo = document.getElementById('firebaseInfo');
-            
-            if (syncElement) {
-                syncElement.className = 'sync-status';
-                
-                switch(status) {
-                    case 'online':
-                        syncElement.classList.add('sync-online');
-                        syncElement.innerHTML = '<i class="fas fa-check-circle"></i><span>Онлайн</span>';
-                        break;
-                    case 'offline':
-                        syncElement.classList.add('sync-offline');
-                        syncElement.innerHTML = '<i class="fas fa-exclamation-circle"></i><span>Офлайн</span>';
-                        break;
-                    case 'pending':
-                        syncElement.classList.add('sync-pending');
-                        syncElement.innerHTML = '<i class="fas fa-sync-alt sync-icon"></i><span>Синхронізація...</span>';
-                        break;
-                }
-            }
-            
-            if (firebaseInfo) {
-                if (status === 'online') {
-                    firebaseInfo.innerHTML = '<i class="fas fa-cloud"></i> Дані синхронізовані з хмарою';
-                } else if (status === 'offline') {
-                    firebaseInfo.innerHTML = '<i class="fas fa-laptop"></i> Робота в офлайн режимі';
-                }
-            }
-            
-            // Скрываем офлайн оверлей если онлайн
-            if (status === 'online') {
-                hideOfflineOverlay();
-            }
-        }
-
-        // Показать офлайн оверлей
-        function showOfflineOverlay() {
-            const overlay = document.getElementById('offlineOverlay');
-            if (overlay) {
-                overlay.classList.add('active');
-            }
-        }
-
-        // Скрыть офлайн оверлей
-        function hideOfflineOverlay() {
-            const overlay = document.getElementById('offlineOverlay');
-            if (overlay) {
-                overlay.classList.remove('active');
-            }
-        }
-
-        // Проверка соединения
-        function checkConnection() {
-            if (!navigator.onLine) {
-                updateSyncStatus('offline');
-                showOfflineOverlay();
-                return false;
-            }
-            return true;
-        }
-
-        // Слушаем изменения состояния сети
-        window.addEventListener('online', () => {
-            updateSyncStatus('online');
-            hideOfflineOverlay();
-        });
-
-        window.addEventListener('offline', () => {
-            updateSyncStatus('offline');
-            showOfflineOverlay();
-        });
-    </script>
-
-    <!-- Основной скрипт приложения -->
-    <script src="script.js"></script>
+    <!-- Supabase SDK -->
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
     
+    <!-- Наши файлы -->
+    <script src="supabase-config.js"></script>
+    <script src="supabase-client.js"></script>
+    <script src="script.js"></script>
+
     <script>
         // Создание частиц
         function createParticles() {
@@ -398,17 +337,120 @@
             login();
         }
         
-        // Инициализация
-        document.addEventListener('DOMContentLoaded', function() {
-            createParticles();
+        // Обновление статуса синхронизации
+        function updateSyncStatus(status, message = '') {
+            const syncElement = document.getElementById('syncStatus');
+            const firebaseStatus = document.getElementById('firebaseStatus');
+            const firebaseInfo = document.getElementById('firebaseInfo');
             
-            // Проверяем соединение
-            checkConnection();
+            if (syncElement) {
+                syncElement.className = 'sync-status';
+                
+                switch(status) {
+                    case 'online':
+                        syncElement.classList.add('sync-online');
+                        syncElement.innerHTML = '<i class="fas fa-check-circle"></i><span>Онлайн</span>';
+                        if (firebaseInfo) {
+                            firebaseInfo.innerHTML = '<i class="fas fa-cloud"></i> Дані синхронізовані з хмарою';
+                        }
+                        break;
+                    case 'offline':
+                        syncElement.classList.add('sync-offline');
+                        syncElement.innerHTML = '<i class="fas fa-exclamation-circle"></i><span>Офлайн</span>';
+                        if (firebaseInfo) {
+                            firebaseInfo.innerHTML = '<i class="fas fa-laptop"></i> Робота в локальному режимі';
+                        }
+                        break;
+                    case 'pending':
+                        syncElement.classList.add('sync-pending');
+                        syncElement.innerHTML = '<i class="fas fa-sync-alt sync-icon"></i><span>Підключення...</span>';
+                        break;
+                }
+            }
+            
+            if (firebaseStatus) {
+                switch(status) {
+                    case 'online':
+                        firebaseStatus.innerHTML = '<small style="color: rgba(255, 255, 255, 0.7);"><i class="fas fa-check-circle" style="color: #1a936f;"></i> Підключено до хмари</small>';
+                        break;
+                    case 'offline':
+                        firebaseStatus.innerHTML = '<small style="color: rgba(255, 255, 255, 0.7);"><i class="fas fa-laptop" style="color: #ff9e00;"></i> Робота в локальному режимі</small>';
+                        break;
+                    case 'pending':
+                        firebaseStatus.innerHTML = '<small style="color: rgba(255, 255, 255, 0.7);"><i class="fas fa-sync-alt fa-spin"></i> Завантаження системи...</small>';
+                        break;
+                }
+            }
+        }
+
+        // Показать офлайн оверлей
+        function showOfflineOverlay() {
+            const overlay = document.getElementById('offlineOverlay');
+            if (overlay) {
+                overlay.classList.add('active');
+            }
+        }
+
+        // Скрыть офлайн оверлей
+        function hideOfflineOverlay() {
+            const overlay = document.getElementById('offlineOverlay');
+            if (overlay) {
+                overlay.classList.remove('active');
+            }
+        }
+
+        // Инициализация системы
+        async function initSystem() {
+            console.log('Ініціалізація системи Хортинг...');
+            updateSyncStatus('pending');
+            
+            // Скрываем офлайн оверлей по умолчанию
+            hideOfflineOverlay();
+            
+            // Даем время на загрузку страницы
+            setTimeout(async () => {
+                // Проверяем интернет
+                if (!navigator.onLine) {
+                    console.log('Інтернет відсутній, працюємо локально');
+                    updateSyncStatus('offline');
+                    // Не показываем оверлей сразу
+                    setTimeout(() => {
+                        if (!navigator.onLine) {
+                            showOfflineOverlay();
+                        }
+                    }, 3000);
+                } else {
+                    console.log('Інтернет є, підключаємо Supabase');
+                    
+                    // Инициализируем Supabase
+                    try {
+                        const supabaseReady = await window.supabaseClient?.init();
+                        if (supabaseReady) {
+                            updateSyncStatus('online');
+                            console.log('✅ Система готова до роботи з Supabase');
+                        } else {
+                            updateSyncStatus('offline');
+                            console.log('⚠️ Працюємо в локальному режимі');
+                        }
+                    } catch (error) {
+                        console.error('Помилка ініціалізації Supabase:', error);
+                        updateSyncStatus('offline');
+                    }
+                }
+            }, 1000);
             
             // Автофокус на поле ввода
             setTimeout(() => {
-                document.getElementById('passwordInput').focus();
-            }, 300);
+                const passwordInput = document.getElementById('passwordInput');
+                if (passwordInput) {
+                    passwordInput.focus();
+                }
+            }, 500);
+        }
+        
+        // Инициализация при загрузке
+        document.addEventListener('DOMContentLoaded', function() {
+            createParticles();
             
             // Проверяем, авторизован ли пользователь
             const userData = JSON.parse(sessionStorage.getItem('horting_user'));
@@ -418,252 +460,43 @@
                 } else {
                     window.location.href = 'team.html';
                 }
-            }
-
-<!-- Firebase конфигурация -->
-<script src="firebase-config.js"></script>
-
-<!-- Основной скрипт приложения -->
-<script src="script.js"></script>
-
-<script>
-    // Создание частиц
-    function createParticles() {
-        const particlesContainer = document.getElementById('particles');
-        const particleCount = window.innerWidth < 768 ? 15 : 30;
-        
-        for (let i = 0; i < particleCount; i++) {
-            const particle = document.createElement('div');
-            particle.className = 'particle';
-            
-            const size = Math.random() * 4 + 1;
-            const posX = Math.random() * 100;
-            const posY = Math.random() * 100;
-            const duration = Math.random() * 20 + 10;
-            const delay = Math.random() * 5;
-            
-            particle.style.cssText = `
-                width: ${size}px;
-                height: ${size}px;
-                left: ${posX}%;
-                top: ${posY}%;
-                animation-duration: ${duration}s;
-                animation-delay: ${delay}s;
-            `;
-            
-            particlesContainer.appendChild(particle);
-        }
-    }
-    
-    // Показать/скрыть пароль
-    document.getElementById('togglePassword').addEventListener('click', function() {
-        const passwordInput = document.getElementById('passwordInput');
-        const icon = this.querySelector('i');
-        
-        if (passwordInput.type === 'password') {
-            passwordInput.type = 'text';
-            icon.className = 'fas fa-eye-slash';
-        } else {
-            passwordInput.type = 'password';
-            icon.className = 'fas fa-eye';
-        }
-    });
-    
-    // Ввод пароля по Enter
-    document.getElementById('passwordInput').addEventListener('keypress', function(e) {
-        if (e.key === 'Enter') {
-            login();
-        }
-    });
-    
-    // Кнопка входа
-    document.getElementById('loginBtn').addEventListener('click', login);
-    
-    // Быстрый вход
-    function quickLogin(password) {
-        document.getElementById('passwordInput').value = password;
-        login();
-    }
-    
-    // Обновление статуса синхронизации
-    function updateSyncStatus(status, message = '') {
-        const syncElement = document.getElementById('syncStatus');
-        const firebaseStatus = document.getElementById('firebaseStatus');
-        
-        if (syncElement) {
-            syncElement.className = 'sync-status';
-            
-            switch(status) {
-                case 'online':
-                    syncElement.classList.add('sync-online');
-                    syncElement.innerHTML = '<i class="fas fa-check-circle"></i><span>Онлайн</span>';
-                    break;
-                case 'offline':
-                    syncElement.classList.add('sync-offline');
-                    syncElement.innerHTML = '<i class="fas fa-exclamation-circle"></i><span>Офлайн</span>';
-                    break;
-                case 'pending':
-                    syncElement.classList.add('sync-pending');
-                    syncElement.innerHTML = '<i class="fas fa-sync-alt sync-icon"></i><span>Підключення...</span>';
-                    break;
-                case 'error':
-                    syncElement.classList.add('sync-offline');
-                    syncElement.innerHTML = '<i class="fas fa-times-circle"></i><span>Помилка</span>';
-                    break;
-            }
-        }
-        
-        if (firebaseStatus) {
-            switch(status) {
-                case 'online':
-                    firebaseStatus.innerHTML = '<small style="color: rgba(255, 255, 255, 0.7);"><i class="fas fa-check-circle" style="color: #1a936f;"></i> Підключено до хмари</small>';
-                    break;
-                case 'offline':
-                    firebaseStatus.innerHTML = '<small style="color: rgba(255, 255, 255, 0.7);"><i class="fas fa-exclamation-triangle" style="color: #ff9e00;"></i> Робота в офлайн режимі</small>';
-                    break;
-                case 'pending':
-                    firebaseStatus.innerHTML = '<small style="color: rgba(255, 255, 255, 0.7);"><i class="fas fa-sync-alt fa-spin"></i> Завантаження системи...</small>';
-                    break;
-                case 'error':
-                    firebaseStatus.innerHTML = `<small style="color: rgba(255, 107, 107, 0.8);"><i class="fas fa-times-circle"></i> ${message || 'Помилка підключення'}</small>`;
-                    break;
-            }
-        }
-    }
-
-    // Показать офлайн оверлей
-    function showOfflineOverlay() {
-        const overlay = document.getElementById('offlineOverlay');
-        if (overlay) {
-            overlay.classList.add('active');
-        }
-    }
-
-    // Скрыть офлайн оверлей
-    function hideOfflineOverlay() {
-        const overlay = document.getElementById('offlineOverlay');
-        if (overlay) {
-            overlay.classList.remove('active');
-        }
-    }
-
-    // Проверка Firebase соединения
-    async function checkFirebaseConnection() {
-        try {
-            if (!window.firebaseConfig) {
-                console.warn('Конфигурация Firebase не найдена');
-                updateSyncStatus('error', 'Конфігурація Firebase відсутня');
-                return false;
+                return;
             }
             
-            // Проверяем, инициализирован ли Firebase
-            if (!firebase.apps.length) {
-                await firebase.initializeApp(window.firebaseConfig);
-            }
+            // Инициализируем систему
+            initSystem();
             
-            const db = firebase.firestore();
-            
-            // Пытаемся сделать простой запрос
-            await db.collection('test').limit(1).get();
-            
-            updateSyncStatus('online');
-            hideOfflineOverlay();
-            return true;
-            
-        } catch (error) {
-            console.warn('Firebase недоступен:', error.message);
-            updateSyncStatus('offline');
-            return false;
-        }
-    }
+            // Слушаем изменения состояния сети
+            window.addEventListener('online', () => {
+                console.log('✅ З\'єднання з інтернетом відновлено');
+                updateSyncStatus('online');
+                hideOfflineOverlay();
+                
+                // Пробуем переподключить Supabase
+                setTimeout(async () => {
+                    try {
+                        const supabaseReady = await window.supabaseClient?.init();
+                        if (supabaseReady) {
+                            console.log('✅ Supabase перепідключено');
+                        }
+                    } catch (error) {
+                        console.log('Не вдалося перепідключити Supabase:', error);
+                    }
+                }, 1000);
+            });
 
-    // Инициализация системы
-    async function initSystem() {
-        console.log('Ініціалізація системи...');
-        updateSyncStatus('pending');
-        
-        // Скрываем офлайн оверлей по умолчанию
-        hideOfflineOverlay();
-        
-        // Сначала проверяем наличие интернета
-        if (!navigator.onLine) {
-            console.log('Немає інтернет з\'єднання');
-            updateSyncStatus('offline');
-            // НЕ показываем оверлей сразу, только через 3 секунды
-            setTimeout(() => {
-                if (!navigator.onLine) {
-                    showOfflineOverlay();
-                }
-            }, 3000);
-            return;
-        }
-        
-        console.log('Є інтернет з\'єднання');
-        
-        // Даем время на загрузку страницы
-        setTimeout(async () => {
-            // Проверяем подключение к Firebase
-            const isFirebaseConnected = await checkFirebaseConnection();
-            
-            if (!isFirebaseConnected) {
-                // Если Firebase не подключился, показываем что работаем локально
+            window.addEventListener('offline', () => {
+                console.log('⚠️ Втрачено з\'єднання з інтернетом');
+                updateSyncStatus('offline');
+                
+                // Показываем оверлей только через 2 секунды
                 setTimeout(() => {
                     if (!navigator.onLine) {
                         showOfflineOverlay();
                     }
                 }, 2000);
-            }
-        }, 1500);
-        
-        // Автофокус на поле ввода
-        setTimeout(() => {
-            const passwordInput = document.getElementById('passwordInput');
-            if (passwordInput) {
-                passwordInput.focus();
-            }
-        }, 500);
-    }
-    
-    // Инициализация при загрузке
-    document.addEventListener('DOMContentLoaded', function() {
-        createParticles();
-        
-        // Сначала проверяем авторизацию
-        const userData = JSON.parse(sessionStorage.getItem('horting_user'));
-        if (userData) {
-            if (userData.role === 'admin') {
-                window.location.href = 'dashboard.html';
-            } else {
-                window.location.href = 'team.html';
-            }
-            return;
-        }
-        
-        // Инициализируем систему с задержкой
-        setTimeout(() => {
-            initSystem();
-        }, 100);
-        
-        // Слушаем изменения состояния сети
-        window.addEventListener('online', () => {
-            console.log('Сеть появилась');
-            updateSyncStatus('online');
-            hideOfflineOverlay();
-            // Перепроверяем Firebase
-            setTimeout(() => {
-                checkFirebaseConnection();
-            }, 1000);
+            });
         });
-
-        window.addEventListener('offline', () => {
-            console.log('Сеть пропала');
-            updateSyncStatus('offline');
-            // Показываем оверлей только через 2 секунды
-            setTimeout(() => {
-                if (!navigator.onLine) {
-                    showOfflineOverlay();
-                }
-            }, 2000);
-        });
-    });
-</script>
+    </script>
+</body>
+</html>
