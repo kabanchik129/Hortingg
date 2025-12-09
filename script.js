@@ -8,283 +8,366 @@ const CONFIG = {
         5: { name: "5-та команда (старша)", color: "#FFEAA7", type: "str" },
         6: { name: "6-та команда (старша)", color: "#DDA0DD", type: "str" }
     },
-    trainingDays: ['вівторок', 'четвер', 'субота'],
-    trainingTime: '18:00'
+    // Расписание: понедельник, среда (16:00-19:00), суббота (12:00-16:00)
+    trainingDays: {
+        'понеділок': { start: '16:00', end: '19:00' },
+        'середа': { start: '16:00', end: '19:00' },
+        'субота': { start: '12:00', end: '16:00' }
+    },
+    // Полный список дней для проверки
+    allTrainingDays: ['понеділок', 'середа', 'субота']
 };
 
-// Серверное хранилище (замена localStorage)
-const ServerStorage = {
-    // Инициализация
-    init() {
-        // Глобальные уведомления
-        if (!localStorage.getItem('horting_global_notifications')) {
-            const defaultNotifications = [
-                {
-                    id: '1',
-                    title: 'Вітання з початком навчання!',
-                    message: 'Ласкаво просимо до гуртка "Хортинг". Бажаємо успіхів у навчанні!',
-                    date: new Date().toISOString(),
-                    author: 'Адміністратор'
-                }
-            ];
-            localStorage.setItem('horting_global_notifications', JSON.stringify(defaultNotifications));
+// Firebase менеджер данных
+const FirebaseManager = {
+    // Инициализация Firebase
+    async init() {
+        try {
+            // Проверяем, есть ли уже конфигурация
+            if (!window.firebaseConfig) {
+                console.warn('Конфигурация Firebase не найдена, работаем в локальном режиме');
+                this.useFirebase = false;
+                return false;
+            }
+            
+            // Инициализируем Firebase если еще не инициализирован
+            if (!firebase.apps.length) {
+                this.app = firebase.initializeApp(window.firebaseConfig);
+                console.log('Firebase инициализирован');
+            } else {
+                this.app = firebase.app();
+            }
+            
+            this.db = firebase.firestore(this.app);
+            this.auth = firebase.auth(this.app);
+            
+            // Включаем офлайн поддержку
+            await this.db.enablePersistence().catch(err => {
+                console.warn('Офлайн поддержка недоступна, работаем онлайн:', err.code);
+            });
+            
+            this.useFirebase = true;
+            console.log('FirebaseManager готов к работе');
+            
+            // Инициализируем начальные данные если нужно
+            await this.initializeDefaultData();
+            
+            return true;
+            
+        } catch (error) {
+            console.error('Ошибка инициализации Firebase:', error);
+            this.useFirebase = false;
+            return false;
         }
+    },
+
+    // Инициализация начальных данных
+    async initializeDefaultData() {
+        if (!this.useFirebase) return;
         
-        // Уведомления админу
-        if (!localStorage.getItem('horting_admin_notifications')) {
-            localStorage.setItem('horting_admin_notifications', JSON.stringify([]));
-        }
-        
-        // Команды
-        for (let i = 1; i <= 6; i++) {
-            if (!localStorage.getItem(`horting_team_${i}`)) {
-                const defaultTeam = {
-                    id: i,
-                    name: CONFIG.teams[i].name,
-                    members: [],
-                    notifications: [],
-                    tasks: [],
-                    absences: []
-                };
+        try {
+            // Проверяем, есть ли уже команды
+            const teamsSnapshot = await this.db.collection('teams').limit(1).get();
+            
+            if (teamsSnapshot.empty) {
+                console.log('Создаем начальные данные в Firebase...');
                 
-    // Глобальные уведомления
-    getGlobalNotifications() {
-        return JSON.parse(localStorage.getItem('horting_global_notifications') || '[]');
-    },
-
-    setGlobalNotifications(notifications) {
-        localStorage.setItem('horting_global_notifications', JSON.stringify(notifications));
-    },
-
-    // Уведомления админу
-    getAdminNotifications() {
-        return JSON.parse(localStorage.getItem('horting_admin_notifications') || '[]');
-    },
-
-    setAdminNotifications(notifications) {
-        localStorage.setItem('horting_admin_notifications', JSON.stringify(notifications));
-    },
-
-    // Команды
-    getTeam(teamId) {
-        const team = localStorage.getItem(`horting_team_${teamId}`);
-        return team ? JSON.parse(team) : null;
-    },
-
-    setTeam(teamId, teamData) {
-        localStorage.setItem(`horting_team_${teamId}`, JSON.stringify(teamData));
-    },
-
-    // Все команды
-    getTeams() {
-        const teams = {};
-        for (let i = 1; i <= 6; i++) {
-            teams[i] = this.getTeam(i);
+                // Создаем команды
+                for (let i = 1; i <= 6; i++) {
+                    const teamData = {
+                        id: i,
+                        name: CONFIG.teams[i].name,
+                        type: CONFIG.teams[i].type,
+                        color: CONFIG.teams[i].color,
+                        members: [],
+                        notifications: [],
+                        tasks: [],
+                        absences: [],
+                        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                    };
+                    
+                    // Тестовые данные для первой команды
+                    if (i === 1) {
+                        teamData.members = [
+                            { id: '1', name: 'Петро Коваль', callSign: 'Командир', rank: 'Старшина', role: 'command' },
+                            { id: '2', name: 'Іван Сидоренко', callSign: 'Заступник', rank: 'Сержант', role: 'deputy' },
+                            { id: '3', name: 'Олексій Мельник', callSign: 'Сокіл', rank: 'Рядовий', role: 'soldier' }
+                        ];
+                        teamData.notifications = [
+                            { 
+                                id: '1', 
+                                title: 'Ласкаво просимо!', 
+                                message: 'Вітаємо в команді 1. Перше заняття завтра о 16:00.', 
+                                date: new Date().toISOString(), 
+                                author: 'Командир' 
+                            }
+                        ];
+                    }
+                    
+                    await this.db.collection('teams').doc(i.toString()).set(teamData);
+                }
+                
+                // Создаем глобальные уведомления
+                await this.db.collection('global_notifications').add({
+                    title: 'Вітання з початком навчання!',
+                    message: 'Ласкаво просимо до гуртка "Хортинг". Бажаємо успіхів у навчанні! Заняття: понеділок, середа (16:00-19:00), субота (12:00-16:00)',
+                    date: new Date().toISOString(),
+                    author: 'Адміністратор',
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                
+                console.log('Начальные данные созданы в Firebase');
+            }
+        } catch (error) {
+            console.error('Ошибка создания начальных данных:', error);
         }
-        return teams;
-    }
-};
-
-// Менеджер команд (интерфейс для работы с данными)
-const TeamManager = {
-    init() {
-        ServerStorage.init();
     },
 
+    // =============== КОМАНДЫ ===============
+    
     // Получить команду
-    getTeam(teamId) {
-        return ServerStorage.getTeam(teamId);
+    async getTeam(teamId) {
+        try {
+            if (this.useFirebase) {
+                const doc = await this.db.collection('teams').doc(teamId.toString()).get();
+                if (doc.exists) {
+                    return doc.data();
+                }
+            }
+        } catch (error) {
+            console.error('Ошибка получения команды из Firebase:', error);
+        }
+        
+        // Fallback на localStorage
+        const localData = localStorage.getItem(`horting_team_${teamId}`);
+        return localData ? JSON.parse(localData) : null;
     },
 
     // Получить все команды
-    getTeams() {
-        return ServerStorage.getTeams();
+    async getTeams() {
+        const teams = {};
+        
+        try {
+            if (this.useFirebase) {
+                const snapshot = await this.db.collection('teams').get();
+                snapshot.forEach(doc => {
+                    teams[doc.id] = doc.data();
+                });
+                return teams;
+            }
+        } catch (error) {
+            console.error('Ошибка получения команд из Firebase:', error);
+        }
+        
+        // Fallback на localStorage
+        for (let i = 1; i <= 6; i++) {
+            const team = await this.getTeam(i);
+            if (team) teams[i] = team;
+        }
+        
+        return teams;
     },
 
     // Сохранить команду
-    saveTeam(teamId, teamData) {
-        ServerStorage.setTeam(teamId, teamData);
-    },
-
-    // Добавить участника
-    addMember(teamId, memberData) {
-        const team = this.getTeam(teamId);
-        if (!team) return false;
-
-        const newMember = {
-            id: Date.now().toString(),
-            name: memberData.name,
-            callSign: memberData.callSign,
-            rank: memberData.rank,
-            role: memberData.role || 'soldier',
-            dateAdded: new Date().toISOString()
-        };
-
-        team.members.push(newMember);
-        this.saveTeam(teamId, team);
-        return true;
-    },
-
-    // Удалить участника
-    removeMember(teamId, memberId) {
-        const team = this.getTeam(teamId);
-        if (!team) return false;
-
-        team.members = team.members.filter(m => m.id !== memberId);
-        this.saveTeam(teamId, team);
-        return true;
-    },
-
-    // Добавить уведомление команды
-    addTeamNotification(teamId, notificationData, author = 'Система') {
-        const team = this.getTeam(teamId);
-        if (!team) return false;
-
-        const newNotification = {
-            id: Date.now().toString(),
-            title: notificationData.title,
-            message: notificationData.message,
-            date: new Date().toISOString(),
-            author: author
-        };
-
-        team.notifications.push(newNotification);
-        this.saveTeam(teamId, team);
-        return true;
-    },
-
-    // Добавить задачу
-    addTask(teamId, taskData) {
-        const team = this.getTeam(teamId);
-        if (!team) return false;
-
-        const newTask = {
-            id: Date.now().toString(),
-            title: taskData.title,
-            description: taskData.description,
-            date: new Date().toISOString(),
-            completed: false
-        };
-
-        team.tasks.push(newTask);
-        this.saveTeam(teamId, team);
-        return true;
-    },
-
-    // Добавить отсутствие
-    addAbsence(teamId, absenceData) {
-        const team = this.getTeam(teamId);
-        if (!team) return false;
-
-        const newAbsence = {
-            id: Date.now().toString(),
-            memberName: absenceData.memberName,
-            date: absenceData.date,
-            reason: absenceData.reason,
-            reportedDate: new Date().toISOString()
-        };
-
-        team.absences.push(newAbsence);
-        this.saveTeam(teamId, team);
-        
-        // Автоматическое удаление через день после даты отсутствия
-        const absenceDate = new Date(absenceData.date);
-        const deleteDate = new Date(absenceDate);
-        deleteDate.setDate(deleteDate.getDate() + 1);
-        deleteDate.setHours(23, 59, 0, 0);
-        
-        const timeUntilDelete = deleteDate.getTime() - Date.now();
-        if (timeUntilDelete > 0) {
-            setTimeout(() => {
-                const currentTeam = this.getTeam(teamId);
-                if (currentTeam) {
-                    currentTeam.absences = currentTeam.absences.filter(a => a.id !== newAbsence.id);
-                    this.saveTeam(teamId, currentTeam);
-                }
-            }, timeUntilDelete);
+    async saveTeam(teamId, teamData) {
+        try {
+            if (this.useFirebase) {
+                await this.db.collection('teams').doc(teamId.toString()).set({
+                    ...teamData,
+                    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                }, { merge: true });
+                console.log(`Команда ${teamId} сохранена в Firebase`);
+            }
+        } catch (error) {
+            console.error('Ошибка сохранения команды в Firebase:', error);
         }
         
+        // Всегда сохраняем в localStorage как резервную копию
+        localStorage.setItem(`horting_team_${teamId}`, JSON.stringify(teamData));
         return true;
     },
 
-    // Глобальные уведомления
-    getGlobalNotifications() {
-        return ServerStorage.getGlobalNotifications();
+    // =============== ГЛОБАЛЬНЫЕ УВЕДОМЛЕНИЯ ===============
+    
+    async getGlobalNotifications() {
+        try {
+            if (this.useFirebase) {
+                const snapshot = await this.db.collection('global_notifications')
+                    .orderBy('createdAt', 'desc')
+                    .get();
+                
+                return snapshot.docs.map(doc => ({
+                    id: doc.id,
+                    ...doc.data()
+                }));
+            }
+        } catch (error) {
+            console.error('Ошибка получения глобальных уведомлений:', error);
+        }
+        
+        // Fallback на localStorage
+        const localData = localStorage.getItem('horting_global_notifications');
+        return localData ? JSON.parse(localData) : [];
     },
 
-    addGlobalNotification(notificationData, author = 'Адміністратор') {
-        const notifications = this.getGlobalNotifications();
+    async addGlobalNotification(notificationData, author = 'Адміністратор') {
         const newNotification = {
-            id: Date.now().toString(),
-            title: notificationData.title,
-            message: notificationData.message,
+            ...notificationData,
             date: new Date().toISOString(),
             author: author,
-            targetTeams: notificationData.targetTeams || null
+            createdAt: firebase.firestore.FieldValue.serverTimestamp()
         };
-
-        notifications.push(newNotification);
-        ServerStorage.setGlobalNotifications(notifications);
+        
+        try {
+            if (this.useFirebase) {
+                const docRef = await this.db.collection('global_notifications').add(newNotification);
+                console.log('Глобальное уведомление добавлено в Firebase:', docRef.id);
+            }
+        } catch (error) {
+            console.error('Ошибка добавления глобального уведомления:', error);
+        }
+        
+        // Сохраняем в localStorage
+        const notifications = await this.getGlobalNotifications();
+        notifications.push({ ...newNotification, id: Date.now().toString() });
+        localStorage.setItem('horting_global_notifications', JSON.stringify(notifications));
+        
         return true;
     },
 
-    deleteGlobalNotification(id) {
-        const notifications = this.getGlobalNotifications();
+    async deleteGlobalNotification(id) {
+        try {
+            if (this.useFirebase) {
+                await this.db.collection('global_notifications').doc(id).delete();
+            }
+        } catch (error) {
+            console.error('Ошибка удаления глобального уведомления:', error);
+        }
+        
+        // Удаляем из localStorage
+        const notifications = await this.getGlobalNotifications();
         const filtered = notifications.filter(n => n.id !== id);
-        ServerStorage.setGlobalNotifications(filtered);
+        localStorage.setItem('horting_global_notifications', JSON.stringify(filtered));
     },
 
-    // Уведомления админу
-    getAdminNotifications() {
-        return ServerStorage.getAdminNotifications();
+    // =============== АДМИН УВЕДОМЛЕНИЯ ===============
+    
+    async getAdminNotifications() {
+        try {
+            if (this.useFirebase) {
+                const snapshot = await this.db.collection('admin_notifications')
+                    .orderBy('date', 'desc')
+                    .get();
+                
+                return snapshot.docs.map(doc => ({
+                    id: doc.id,
+                    ...doc.data()
+                }));
+            }
+        } catch (error) {
+            console.error('Ошибка получения админ уведомлений:', error);
+        }
+        
+        // Fallback на localStorage
+        const localData = localStorage.getItem('horting_admin_notifications');
+        return localData ? JSON.parse(localData) : [];
     },
 
-    addAdminNotification(message, fromTeam) {
-        const notifications = this.getAdminNotifications();
+    async addAdminNotification(message, fromTeam) {
         const newNotification = {
-            id: Date.now().toString(),
             message: message,
             date: new Date().toISOString(),
             fromTeam: fromTeam,
-            read: false
+            read: false,
+            createdAt: firebase.firestore.FieldValue.serverTimestamp()
         };
-
-        notifications.push(newNotification);
-        ServerStorage.setAdminNotifications(notifications);
+        
+        try {
+            if (this.useFirebase) {
+                await this.db.collection('admin_notifications').add(newNotification);
+            }
+        } catch (error) {
+            console.error('Ошибка добавления админ уведомления:', error);
+        }
+        
+        // Сохраняем в localStorage
+        const notifications = await this.getAdminNotifications();
+        notifications.push({ ...newNotification, id: Date.now().toString() });
+        localStorage.setItem('horting_admin_notifications', JSON.stringify(notifications));
+        
         return true;
     },
 
-    markNotificationAsRead(id) {
-        const notifications = this.getAdminNotifications();
+    async markNotificationAsRead(id) {
+        try {
+            if (this.useFirebase) {
+                await this.db.collection('admin_notifications').doc(id).update({
+                    read: true
+                });
+            }
+        } catch (error) {
+            console.error('Ошибка обновления уведомления:', error);
+        }
+        
+        // Обновляем в localStorage
+        const notifications = await this.getAdminNotifications();
         const notification = notifications.find(n => n.id === id);
         if (notification) {
             notification.read = true;
-            ServerStorage.setAdminNotifications(notifications);
+            localStorage.setItem('horting_admin_notifications', JSON.stringify(notifications));
         }
     },
 
-    markAllNotificationsAsRead() {
-        const notifications = this.getAdminNotifications();
+    async markAllNotificationsAsRead() {
+        try {
+            if (this.useFirebase) {
+                const snapshot = await this.db.collection('admin_notifications').where('read', '==', false).get();
+                const batch = this.db.batch();
+                
+                snapshot.docs.forEach(doc => {
+                    batch.update(doc.ref, { read: true });
+                });
+                
+                await batch.commit();
+            }
+        } catch (error) {
+            console.error('Ошибка массового обновления уведомлений:', error);
+        }
+        
+        // Обновляем в localStorage
+        const notifications = await this.getAdminNotifications();
         notifications.forEach(n => n.read = true);
-        ServerStorage.setAdminNotifications(notifications);
+        localStorage.setItem('horting_admin_notifications', JSON.stringify(notifications));
     },
 
-    deleteAdminNotification(id) {
-        const notifications = this.getAdminNotifications();
+    async deleteAdminNotification(id) {
+        try {
+            if (this.useFirebase) {
+                await this.db.collection('admin_notifications').doc(id).delete();
+            }
+        } catch (error) {
+            console.error('Ошибка удаления админ уведомления:', error);
+        }
+        
+        // Удаляем из localStorage
+        const notifications = await this.getAdminNotifications();
         const filtered = notifications.filter(n => n.id !== id);
-        ServerStorage.setAdminNotifications(filtered);
+        localStorage.setItem('horting_admin_notifications', JSON.stringify(filtered));
     },
 
-    getUnreadCount() {
-        const notifications = this.getAdminNotifications();
+    async getUnreadCount() {
+        const notifications = await this.getAdminNotifications();
         return notifications.filter(n => !n.read).length;
     }
 };
 
+// Парсинг пароля
 function parsePassword(password) {
     if (!password) return null;
     
     password = password.trim().toLowerCase();
+    console.log('Парсим пароль:', password);
     
     // Админский пароль
     if (password === 'kyka7') {
@@ -297,30 +380,23 @@ function parsePassword(password) {
         };
     }
     
-    // Убираем старый строгий паттерн, используем более гибкий
-    // Пароли в формате: mal1kab123_kam, str4kab456_zam, mal2kab777
-    
     // Ищем команду (mal1, str4 и т.д.)
     let teamId = null;
     let teamType = null;
     let isCommander = false;
     let isDeputy = false;
     
-    // Ищем номер команды
+    // Ищем номер команды от 1 до 6
     for (let i = 1; i <= 6; i++) {
-        if (password.includes(`mal${i}`) || password.includes(`str${i}`)) {
+        if (password.includes(`mal${i}`)) {
             teamId = i;
-            teamType = password.includes('mal') ? 'mal' : 'str';
+            teamType = 'mal';
             break;
         }
-    }
-    
-    if (!teamId) {
-        // Пробуем другие варианты
-        const match = password.match(/(mal|str)([1-6])/);
-        if (match) {
-            teamId = parseInt(match[2]);
-            teamType = match[1];
+        if (password.includes(`str${i}`)) {
+            teamId = i;
+            teamType = 'str';
+            break;
         }
     }
     
@@ -330,75 +406,23 @@ function parsePassword(password) {
     isCommander = password.includes('_kam');
     isDeputy = password.includes('_zam');
     
-    // Если нет _kam или _zam, но есть kab, то это обычный боец
-    const isSoldier = password.includes('kab') && !isCommander && !isDeputy;
-    
     return {
         role: 'user',
         teamId: teamId,
         teamType: teamType,
         isCommander: isCommander,
-        isDeputy: isDeputy,
-        isSoldier: isSoldier
+        isDeputy: isDeputy
     };
 }
-            
-// Авторизация
-function login() {
-    const passwordInput = document.getElementById('passwordInput');
-    const errorElement = document.getElementById('errorMessage');
-    
-    if (!passwordInput) return;
-    
-    const password = passwordInput.value.trim();
 
-    function login() {
+// Авторизация
+async function login() {
     const passwordInput = document.getElementById('passwordInput');
     const errorElement = document.getElementById('errorMessage');
     
     if (!passwordInput) return;
     
     const password = passwordInput.value.trim();
-    
-    // Очистка предыдущей ошибки
-    if (errorElement) {
-        errorElement.style.display = 'none';
-        errorElement.textContent = '';
-    }
-    
-    if (!password) {
-        if (errorElement) {
-            errorElement.textContent = 'Будь ласка, введіть пароль!';
-            errorElement.style.display = 'block';
-        }
-        passwordInput.focus();
-        return;
-    }
-    
-    console.log('Пароль для проверки:', password);
-    const userData = parsePassword(password);
-    console.log('Результат парсинга:', userData);
-    
-    if (!userData) {
-        if (errorElement) {
-            errorElement.textContent = 'Невірний пароль!';
-            errorElement.style.display = 'block';
-        }
-        passwordInput.focus();
-        passwordInput.select();
-        return;
-    }
-    
-    // Сохраняем данные пользователя
-    sessionStorage.setItem('horting_user', JSON.stringify(userData));
-    
-    // Перенаправляем в зависимости от роли
-    if (userData.role === 'admin') {
-        window.location.href = 'dashboard.html';
-    } else {
-        window.location.href = 'team.html';
-    }
-}
     
     // Очистка предыдущей ошибки
     if (errorElement) {
@@ -491,13 +515,13 @@ function formatDate(dateString) {
     }
 }
 
-// Получить название дня недели
+// Получить название дня недели на украинском
 function getDayName(dayIndex) {
     const days = ['неділя', 'понеділок', 'вівторок', 'середа', 'четвер', 'п\'ятниця', 'субота'];
     return days[dayIndex];
 }
 
-// Получить ближайшие тренировки
+// Получить ближайшие тренировки с правильным временем
 function getNextTrainings(count = 3) {
     const trainings = [];
     const today = new Date();
@@ -509,7 +533,8 @@ function getNextTrainings(count = 3) {
         
         const dayName = getDayName(date.getDay());
         
-        if (CONFIG.trainingDays.includes(dayName)) {
+        if (CONFIG.trainingDays[dayName]) {
+            const schedule = CONFIG.trainingDays[dayName];
             trainings.push({
                 date: date.toLocaleDateString('uk-UA', {
                     day: '2-digit',
@@ -517,7 +542,9 @@ function getNextTrainings(count = 3) {
                     year: 'numeric'
                 }),
                 day: dayName,
-                time: CONFIG.trainingTime,
+                time: schedule.start + '-' + schedule.end,
+                startTime: schedule.start,
+                endTime: schedule.end,
                 isToday: i === 0,
                 fullDate: date
             });
@@ -538,29 +565,188 @@ function isTrainingDay(date) {
         if (isNaN(checkDate.getTime())) return false;
         
         const dayName = getDayName(checkDate.getDay());
-        return CONFIG.trainingDays.includes(dayName);
+        return CONFIG.trainingDays[dayName] !== undefined;
     } catch (e) {
         return false;
     }
 }
 
 // Отправка сообщения админу
-function sendToAdmin(message, fromTeam) {
+async function sendToAdmin(message, fromTeam) {
     if (!message || !fromTeam) return false;
-    return TeamManager.addAdminNotification(message, fromTeam);
+    return await FirebaseManager.addAdminNotification(message, fromTeam);
 }
 
-// Модальное окно
+// Менеджер команд для обратной совместимости
+const TeamManager = {
+    async init() {
+        await FirebaseManager.init();
+    },
+
+    async getTeam(teamId) {
+        return await FirebaseManager.getTeam(teamId);
+    },
+
+    async getTeams() {
+        return await FirebaseManager.getTeams();
+    },
+
+    async saveTeam(teamId, teamData) {
+        return await FirebaseManager.saveTeam(teamId, teamData);
+    },
+
+    async addMember(teamId, memberData) {
+        const team = await this.getTeam(teamId);
+        if (!team) return false;
+
+        const newMember = {
+            id: Date.now().toString(),
+            name: memberData.name,
+            callSign: memberData.callSign,
+            rank: memberData.rank,
+            role: memberData.role || 'soldier',
+            dateAdded: new Date().toISOString()
+        };
+
+        if (!team.members) team.members = [];
+        team.members.push(newMember);
+        
+        await this.saveTeam(teamId, team);
+        return true;
+    },
+
+    async removeMember(teamId, memberId) {
+        const team = await this.getTeam(teamId);
+        if (!team || !team.members) return false;
+
+        team.members = team.members.filter(m => m.id !== memberId);
+        await this.saveTeam(teamId, team);
+        return true;
+    },
+
+    async addTeamNotification(teamId, notificationData, author = 'Система') {
+        const team = await this.getTeam(teamId);
+        if (!team) return false;
+
+        const newNotification = {
+            id: Date.now().toString(),
+            title: notificationData.title,
+            message: notificationData.message,
+            date: new Date().toISOString(),
+            author: author
+        };
+
+        if (!team.notifications) team.notifications = [];
+        team.notifications.push(newNotification);
+        
+        await this.saveTeam(teamId, team);
+        return true;
+    },
+
+    async addTask(teamId, taskData) {
+        const team = await this.getTeam(teamId);
+        if (!team) return false;
+
+        const newTask = {
+            id: Date.now().toString(),
+            title: taskData.title,
+            description: taskData.description,
+            date: new Date().toISOString(),
+            completed: false
+        };
+
+        if (!team.tasks) team.tasks = [];
+        team.tasks.push(newTask);
+        
+        await this.saveTeam(teamId, team);
+        return true;
+    },
+
+    async addAbsence(teamId, absenceData) {
+        const team = await this.getTeam(teamId);
+        if (!team) return false;
+
+        const newAbsence = {
+            id: Date.now().toString(),
+            memberName: absenceData.memberName,
+            date: absenceData.date,
+            reason: absenceData.reason,
+            reportedDate: new Date().toISOString()
+        };
+
+        if (!team.absences) team.absences = [];
+        team.absences.push(newAbsence);
+        
+        await this.saveTeam(teamId, team);
+        
+        // Автоматическое удаление через день после даты отсутствия
+        const absenceDate = new Date(absenceData.date);
+        const deleteDate = new Date(absenceDate);
+        deleteDate.setDate(deleteDate.getDate() + 1);
+        deleteDate.setHours(23, 59, 0, 0);
+        
+        const timeUntilDelete = deleteDate.getTime() - Date.now();
+        if (timeUntilDelete > 0) {
+            setTimeout(async () => {
+                const currentTeam = await this.getTeam(teamId);
+                if (currentTeam && currentTeam.absences) {
+                    currentTeam.absences = currentTeam.absences.filter(a => a.id !== newAbsence.id);
+                    await this.saveTeam(teamId, currentTeam);
+                }
+            }, timeUntilDelete);
+        }
+        
+        return true;
+    },
+
+    async getGlobalNotifications() {
+        return await FirebaseManager.getGlobalNotifications();
+    },
+
+    async addGlobalNotification(notificationData, author = 'Адміністратор') {
+        return await FirebaseManager.addGlobalNotification(notificationData, author);
+    },
+
+    async deleteGlobalNotification(id) {
+        return await FirebaseManager.deleteGlobalNotification(id);
+    },
+
+    async getAdminNotifications() {
+        return await FirebaseManager.getAdminNotifications();
+    },
+
+    async addAdminNotification(message, fromTeam) {
+        return await FirebaseManager.addAdminNotification(message, fromTeam);
+    },
+
+    async markNotificationAsRead(id) {
+        return await FirebaseManager.markNotificationAsRead(id);
+    },
+
+    async markAllNotificationsAsRead() {
+        return await FirebaseManager.markAllNotificationsAsRead();
+    },
+
+    async deleteAdminNotification(id) {
+        return await FirebaseManager.deleteAdminNotification(id);
+    },
+
+    async getUnreadCount() {
+        return await FirebaseManager.getUnreadCount();
+    }
+};
+
+// Модальное окно (оставляем без изменений)
 const Modal = {
     show(title, content, buttons = []) {
+        // ... существующий код модального окна ...
         return new Promise((resolve) => {
-            // Удаляем существующие модальные окна
+            // Код модального окна из предыдущей версии
             const existingModal = document.querySelector('.modal-overlay');
             if (existingModal) {
                 document.body.removeChild(existingModal);
             }
             
-            // Создаем оверлей
             const overlay = document.createElement('div');
             overlay.className = 'modal-overlay';
             overlay.style.cssText = `
@@ -578,7 +764,6 @@ const Modal = {
                 padding: 20px;
             `;
             
-            // Создаем модальное окно
             const modal = document.createElement('div');
             modal.className = 'modal';
             modal.style.cssText = `
@@ -591,7 +776,6 @@ const Modal = {
                 box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
             `;
             
-            // Заголовок
             const titleElement = document.createElement('h3');
             titleElement.textContent = title;
             titleElement.style.cssText = `
@@ -603,16 +787,13 @@ const Modal = {
             `;
             modal.appendChild(titleElement);
             
-            // Контент
             const contentElement = document.createElement('div');
             contentElement.innerHTML = content;
             contentElement.style.cssText = 'color: #e0e1dd; line-height: 1.6; font-size: 14px;';
             modal.appendChild(contentElement);
             
-            // Кнопки
             if (buttons.length > 0) {
                 const actions = document.createElement('div');
-                actions.className = 'modal-actions';
                 actions.style.cssText = 'display: flex; gap: 15px; margin-top: 25px;';
                 
                 buttons.forEach(button => {
@@ -633,7 +814,6 @@ const Modal = {
             overlay.appendChild(modal);
             document.body.appendChild(overlay);
             
-            // Закрытие по клику на оверлей
             overlay.onclick = (e) => {
                 if (e.target === overlay) {
                     document.body.removeChild(overlay);
@@ -641,7 +821,6 @@ const Modal = {
                 }
             };
             
-            // Закрытие по Escape
             const handleEscape = (e) => {
                 if (e.key === 'Escape') {
                     document.body.removeChild(overlay);
@@ -654,6 +833,7 @@ const Modal = {
     },
 
     showForm(title, fields) {
+        // ... существующий код формы ...
         return new Promise((resolve) => {
             let formHTML = '';
             
@@ -752,9 +932,9 @@ function exitViewMode() {
 }
 
 // Инициализация при загрузке страницы
-document.addEventListener('DOMContentLoaded', function() {
-    // Инициализируем хранилище команд
-    TeamManager.init();
+document.addEventListener('DOMContentLoaded', async function() {
+    // Инициализируем FirebaseManager
+    await TeamManager.init();
     
     // Для страницы входа
     if (document.getElementById('passwordInput')) {
@@ -780,7 +960,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 
-// Экспортируем глобальные функции для использования в других скриптах
+// Экспортируем глобальные функции
 window.TeamManager = TeamManager;
 window.parsePassword = parsePassword;
 window.login = login;
@@ -793,183 +973,3 @@ window.sendToAdmin = sendToAdmin;
 window.Modal = Modal;
 window.exitViewMode = exitViewMode;
 window.CONFIG = CONFIG;
-
-        // =================== Firebase функции ===================
-
-// Инициализация Firebase
-async function initFirebase() {
-    try {
-        if (window.firestore && window.firebaseApp) {
-            console.log('Firebase уже инициализирован');
-            return true;
-        }
-        
-        // Если Firebase не загружен, ждем
-        let attempts = 0;
-        while (!window.firebase && attempts < 10) {
-            await new Promise(resolve => setTimeout(resolve, 500));
-            attempts++;
-        }
-        
-        if (window.firebase && window.firebaseConfig) {
-            const app = firebase.initializeApp(window.firebaseConfig);
-            const db = firebase.firestore(app);
-            const auth = firebase.auth(app);
-            
-            window.firebaseApp = app;
-            window.firestore = db;
-            window.auth = auth;
-            
-            console.log('Firebase инициализирован');
-            return true;
-        }
-        
-        return false;
-    } catch (error) {
-        console.error('Ошибка инициализации Firebase:', error);
-        return false;
-    }
-}
-
-// Сохранить команду в Firebase
-async function saveTeamToFirebase(teamId, data) {
-    try {
-        if (!window.firestore) {
-            await initFirebase();
-        }
-        
-        if (window.firestore) {
-            await firestore.collection('teams').doc(teamId.toString()).set({
-                ...data,
-                id: teamId,
-                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-            }, { merge: true });
-            console.log(`Команда ${teamId} сохранена в Firebase`);
-            return true;
-        }
-    } catch (error) {
-        console.error('Ошибка сохранения в Firebase:', error);
-    }
-    
-    // Fallback на localStorage
-    localStorage.setItem(`horting_team_${teamId}`, JSON.stringify(data));
-    return false;
-}
-
-// Загрузить команду из Firebase
-async function loadTeamFromFirebase(teamId) {
-    try {
-        if (!window.firestore) {
-            await initFirebase();
-        }
-        
-        if (window.firestore) {
-            const doc = await firestore.collection('teams').doc(teamId.toString()).get();
-            if (doc.exists) {
-                console.log(`Команда ${teamId} загружена из Firebase`);
-                return doc.data();
-            }
-        }
-    } catch (error) {
-        console.error('Ошибка загрузки из Firebase:', error);
-    }
-    
-    // Fallback на localStorage
-    const localData = localStorage.getItem(`horting_team_${teamId}`);
-    return localData ? JSON.parse(localData) : null;
-}
-
-// Обновленный TeamManager для работы с Firebase
-const TeamManagerWithFirebase = {
-    ...TeamManager,
-    
-    // Переопределяем метод сохранения команды
-    saveTeam(teamId, teamData) {
-        // Сохраняем локально
-        ServerStorage.setTeam(teamId, teamData);
-        
-        // Сохраняем в Firebase (асинхронно)
-        saveTeamToFirebase(teamId, teamData).catch(error => {
-            console.error('Не удалось сохранить в Firebase:', error);
-        });
-    },
-    
-    // Переопределяем метод получения команды
-    getTeam(teamId) {
-        // Пробуем получить из Firebase если есть соединение
-        if (navigator.onLine) {
-            loadTeamFromFirebase(teamId).then(firebaseData => {
-                if (firebaseData) {
-                    // Если получили из Firebase, обновляем локальные данные
-                    localStorage.setItem(`horting_team_${teamId}`, JSON.stringify(firebaseData));
-                    return firebaseData;
-                }
-            }).catch(error => {
-                console.error('Ошибка загрузки из Firebase:', error);
-            });
-        }
-        
-        // Возвращаем локальные данные (могут быть устаревшими)
-        return ServerStorage.getTeam(teamId);
-    }
-};
-
-// Заменим глобальный TeamManager на обновленный
-window.TeamManager = TeamManagerWithFirebase;
-
-// Инициализация Firebase при загрузке страницы
-document.addEventListener('DOMContentLoaded', async function() {
-    // Инициализируем локальное хранилище
-    TeamManager.init();
-    
-    // Инициализируем Firebase
-    if (window.firebaseConfig) {
-        const firebaseLoaded = await initFirebase();
-        if (firebaseLoaded) {
-            console.log('Firebase готов к работе');
-            
-            // Загружаем начальные данные из Firebase при первом запуске
-            await initializeDefaultFirebaseData();
-        }
-    }
-    
-    // Остальной код инициализации...
-});
-
-// Функция для инициализации данных в Firebase
-async function initializeDefaultFirebaseData() {
-    try {
-        if (!window.firestore) return;
-        
-        // Проверяем, есть ли уже данные
-        const teamsSnapshot = await firestore.collection('teams').limit(1).get();
-        
-        if (teamsSnapshot.empty) {
-            console.log('Создаем начальные данные в Firebase...');
-            
-            // Создаем базовые команды
-            for (let i = 1; i <= 6; i++) {
-                const teamData = ServerStorage.getTeam(i);
-                if (teamData) {
-                    await firestore.collection('teams').doc(i.toString()).set({
-                        ...teamData,
-                        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-                    });
-                }
-            }
-            
-            // Создаем глобальные уведомления
-            const globalNotifications = ServerStorage.getGlobalNotifications();
-            for (const notification of globalNotifications) {
-                await firestore.collection('global_notifications').add({
-                    ...notification,
-                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
-                });
-            }
-            
-            console.log('Начальные данные созданы в Firebase');
-        }
-    } catch (error) {
-        console.error('Ошибка инициализации Firebase данных:', error);
-    }
-}
