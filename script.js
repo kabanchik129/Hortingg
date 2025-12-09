@@ -351,6 +351,54 @@ function login() {
     if (!passwordInput) return;
     
     const password = passwordInput.value.trim();
+
+    function login() {
+    const passwordInput = document.getElementById('passwordInput');
+    const errorElement = document.getElementById('errorMessage');
+    
+    if (!passwordInput) return;
+    
+    const password = passwordInput.value.trim();
+    
+    // Очистка предыдущей ошибки
+    if (errorElement) {
+        errorElement.style.display = 'none';
+        errorElement.textContent = '';
+    }
+    
+    if (!password) {
+        if (errorElement) {
+            errorElement.textContent = 'Будь ласка, введіть пароль!';
+            errorElement.style.display = 'block';
+        }
+        passwordInput.focus();
+        return;
+    }
+    
+    console.log('Пароль для проверки:', password);
+    const userData = parsePassword(password);
+    console.log('Результат парсинга:', userData);
+    
+    if (!userData) {
+        if (errorElement) {
+            errorElement.textContent = 'Невірний пароль!';
+            errorElement.style.display = 'block';
+        }
+        passwordInput.focus();
+        passwordInput.select();
+        return;
+    }
+    
+    // Сохраняем данные пользователя
+    sessionStorage.setItem('horting_user', JSON.stringify(userData));
+    
+    // Перенаправляем в зависимости от роли
+    if (userData.role === 'admin') {
+        window.location.href = 'dashboard.html';
+    } else {
+        window.location.href = 'team.html';
+    }
+}
     
     // Очистка предыдущей ошибки
     if (errorElement) {
