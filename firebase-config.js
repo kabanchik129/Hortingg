@@ -1,14 +1,17 @@
 // firebase-config.js
 
 // Конфигурация Firebase (замените на свои данные из Firebase Console)
-const firebaseConfig = {
-    apiKey: "AIzaSyD...YOUR_API_KEY_HERE...",
-    authDomain: "your-project-id.firebaseapp.com",
-    projectId: "your-project-id",
-    storageBucket: "your-project-id.appspot.com",
-    messagingSenderId: "123456789012",
-    appId: "1:123456789012:web:abcdef1234567890"
+const firebaseConfig = { 
+  apiKey : "AIzaSyBIG0qp7QJt7S4dvwMHpuqsjyJ7kkyR64A" , 
+  authDomain : "hortingg.firebaseapp.com" , 
+  databaseURL : "https://hortingg-default-rtdb.firebaseio.com" , 
+  projectId : "hortingg" , 
+  storageBucket : "hortingg.firebasestorage.app" , 
+  messagingSenderId : "374849935944" , 
+  appId : "1:374849935944:web:547de2b74b732ae2af167d" , 
+  MeasurementId : "G-CLCXKTXXVN" 
 };
+
 
 // Инициализация Firebase
 let app, db, auth;
