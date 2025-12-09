@@ -1,3 +1,57 @@
+// ============ Firebase инициализация ============
+let firebaseApp, firestore, auth;
+
+async function initFirebase() {
+    try {
+        console.log('Ініціалізація Firebase...');
+        
+        // Проверяем, есть ли конфигурация
+        if (!window.firebaseConfig) {
+            console.warn('Конфігурація Firebase не знайдена');
+            return false;
+        }
+        
+        // Проверяем, загружена ли Firebase
+        if (typeof firebase === 'undefined') {
+            console.warn('Firebase SDK не завантажено');
+            return false;
+        }
+        
+        // Инициализируем Firebase
+        if (!firebase.apps.length) {
+            firebaseApp = firebase.initializeApp(window.firebaseConfig);
+            console.log('Firebase ініціалізовано');
+        } else {
+            firebaseApp = firebase.app();
+            console.log('Firebase вже ініціалізовано');
+        }
+        
+        // Инициализируем Firestore и Auth
+        firestore = firebase.firestore();
+        auth = firebase.auth();
+        
+        // Сохраняем в глобальные переменные
+        window.firebaseApp = firebaseApp;
+        window.firestore = firestore;
+        window.auth = auth;
+        
+        // Включаем офлайн поддержку
+        try {
+            await firestore.enablePersistence();
+            console.log('Firestore офлайн підтримка увімкнена');
+        } catch (err) {
+            console.warn('Офлайн підтримка недоступна:', err.code);
+        }
+        
+        console.log('Firebase готовий до роботи');
+        return true;
+        
+    } catch (error) {
+        console.error('Помилка ініціалізації Firebase:', error);
+        return false;
+    }
+}
+
 // Конфигурация системы
 const CONFIG = {
     teams: {
