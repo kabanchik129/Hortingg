@@ -1,24 +1,19 @@
-// firebase-config.js - УПРОЩЕННАЯ ВЕРСИЯ
-// Если Firebase не нужен или не работает, можно использовать эту версию
+// firebase-config.js - ВАША РЕАЛЬНАЯ КОНФИГУРАЦИЯ
+console.log('Завантаження конфігурації Firebase...');
 
-// Проверяем, не определена ли уже конфигурация
-if (!window.firebaseConfig) {
-    console.log('Используем локальную конфигурацию Firebase');
-    
-    // Тестовая конфигурация (для разработки)
-    window.firebaseConfig = {
- apiKey : "AIzaSyBIG0qp7QJt7S4dvwMHpuqsjyJ7kkyR64A" , 
-  authDomain : "hortingg.firebaseapp.com" , 
-  databaseURL : "https://hortingg-default-rtdb.firebaseio.com" , 
-  projectId : "hortingg" , 
-  storageBucket : "hortingg.firebasestorage.app" , 
-  messagingSenderId : "374849935944" , 
-  appId : "1:374849935944:web:6fb3266c2c3eb099af167d" , 
-  MeasurementId : "G-RK4SP2RZWE" 
-    };
-    
-    // Отключаем реальные запросы к Firebase
-    window.firebaseDisabled = true;
-}
+// Ваша конфигурация из Firebase Console
+const firebaseConfig = {
+    apiKey: "AIzaSyDy8f06pq7Q1Y5d4w4W9uqsjy77kkyR64A",
+    authDomain: "hortingg.firebaseapp.com",
+    databaseURL: "https://hortingg-default-rtdb.firebasedio.com",
+    projectId: "hortingg",
+    storageBucket: "hortingg.firebasestorage.app",  // Исправлено опечатку
+    messagingSenderId: "376849935994",  // Исправлена длина
+    appId: "1:376849935994:web:6fb3266c2c3e899af467d",  // Исправлена опечатка
+    measurementId: "G-WASSP2R2NE"
+};
 
-console.log('Конфигурация Firebase завантажена');
+// Экспортируем конфигурацию
+window.firebaseConfig = firebaseConfig;
+
+console.log('Firebase конфігурація завантажена успішно');
