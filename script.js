@@ -47,29 +47,6 @@ const ServerStorage = {
                     absences: []
                 };
                 
-                // Тестовые данные для первой команды
-                if (i === 1) {
-                    defaultTeam.members = [
-                        { id: '1', name: 'Петро Коваль', callSign: 'Командир', rank: 'Старшина', role: 'command' },
-                        { id: '2', name: 'Іван Сидоренко', callSign: 'Заступник', rank: 'Сержант', role: 'deputy' },
-                        { id: '3', name: 'Олексій Мельник', callSign: 'Сокіл', rank: 'Рядовий', role: 'soldier' }
-                    ];
-                    defaultTeam.notifications = [
-                        { 
-                            id: '1', 
-                            title: 'Ласкаво просимо!', 
-                            message: 'Вітаємо в команді 1. Перше заняття завтра о 18:00.', 
-                            date: new Date().toISOString(), 
-                            author: 'Командир' 
-                        }
-                    ];
-                }
-                
-                localStorage.setItem(`horting_team_${i}`, JSON.stringify(defaultTeam));
-            }
-        }
-    },
-
     // Глобальные уведомления
     getGlobalNotifications() {
         return JSON.parse(localStorage.getItem('horting_global_notifications') || '[]');
@@ -304,7 +281,6 @@ const TeamManager = {
     }
 };
 
-// Парсинг пароля
 function parsePassword(password) {
     if (!password) return null;
     
@@ -321,28 +297,52 @@ function parsePassword(password) {
         };
     }
     
-    // Проверка формата пароля
-    const pattern = /^(mal|str)([1-6])kab(\d{3})(?:_(kam|zam))?$/;
-    const match = password.match(pattern);
+    // Убираем старый строгий паттерн, используем более гибкий
+    // Пароли в формате: mal1kab123_kam, str4kab456_zam, mal2kab777
     
-    if (!match) return null;
+    // Ищем команду (mal1, str4 и т.д.)
+    let teamId = null;
+    let teamType = null;
+    let isCommander = false;
+    let isDeputy = false;
     
-    const [, teamType, teamNumber, code, role] = match;
-    const teamId = parseInt(teamNumber);
+    // Ищем номер команды
+    for (let i = 1; i <= 6; i++) {
+        if (password.includes(`mal${i}`) || password.includes(`str${i}`)) {
+            teamId = i;
+            teamType = password.includes('mal') ? 'mal' : 'str';
+            break;
+        }
+    }
     
-    // Проверка существования команды
-    if (!CONFIG.teams[teamId]) return null;
+    if (!teamId) {
+        // Пробуем другие варианты
+        const match = password.match(/(mal|str)([1-6])/);
+        if (match) {
+            teamId = parseInt(match[2]);
+            teamType = match[1];
+        }
+    }
+    
+    if (!teamId) return null;
+    
+    // Проверяем роль
+    isCommander = password.includes('_kam');
+    isDeputy = password.includes('_zam');
+    
+    // Если нет _kam или _zam, но есть kab, то это обычный боец
+    const isSoldier = password.includes('kab') && !isCommander && !isDeputy;
     
     return {
         role: 'user',
         teamId: teamId,
         teamType: teamType,
-        isCommander: role === 'kam',
-        isDeputy: role === 'zam',
-        passwordCode: code
+        isCommander: isCommander,
+        isDeputy: isDeputy,
+        isSoldier: isSoldier
     };
 }
-
+            
 // Авторизация
 function login() {
     const passwordInput = document.getElementById('passwordInput');
