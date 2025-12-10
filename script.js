@@ -227,44 +227,120 @@ function isTrainingDay(date) {
 // Менеджер команд
 const TeamManager = {
     async init() {
-        // Инициализируем Supabase клиент
         return await window.supabaseClient?.init();
     },
 
     // Получить команду
     async getTeam(teamId) {
-        return await window.supabaseClient?.getTeam(teamId);
+        const team = await window.supabaseClient?.getTeam(teamId);
+        if (!team) {
+            // Если команды нет, создаем базовую структуру
+            return {
+                id: teamId,
+                name: CONFIG.teams[teamId]?.name || `Команда ${teamId}`,
+                color: CONFIG.teams[teamId]?.color || "#29c4ff",
+                type: teamId <= 3 ? 'mal' : 'str',
+                members: [],
+                notifications: [],
+                tasks: [],
+                absences: []
+            };
+        }
+        
+        // Убедимся, что все поля существуют
+        return {
+            id: teamId,
+            name: team.name || CONFIG.teams[teamId]?.name || `Команда ${teamId}`,
+            color: team.color || CONFIG.teams[teamId]?.color || "#29c4ff",
+            type: team.type || (teamId <= 3 ? 'mal' : 'str'),
+            members: team.members || [],
+            notifications: team.notifications || [],
+            tasks: team.tasks || [],
+            absences: team.absences || []
+        };
     },
 
     // Получить все команды
     async getTeams() {
-        return await window.supabaseClient?.getTeams();
+        const teams = await window.supabaseClient?.getTeams();
+        if (!teams) return {};
+        
+        // Убедимся, что все команды имеют правильную структуру
+        Object.keys(teams).forEach(teamId => {
+            if (!teams[teamId]) {
+                teams[teamId] = {
+                    id: teamId,
+                    name: CONFIG.teams[teamId]?.name || `Команда ${teamId}`,
+                    color: CONFIG.teams[teamId]?.color || "#29c4ff",
+                    type: teamId <= 3 ? 'mal' : 'str',
+                    members: [],
+                    notifications: [],
+                    tasks: [],
+                    absences: []
+                };
+            }
+        });
+        
+        return teams;
     },
 
     // Сохранить команду
     async saveTeam(teamId, teamData) {
-        return await window.supabaseClient?.saveTeam(teamId, teamData);
+        const teamToSave = {
+            id: teamId,
+            name: teamData.name || CONFIG.teams[teamId]?.name || `Команда ${teamId}`,
+            color: teamData.color || CONFIG.teams[teamId]?.color || "#29c4ff",
+            type: teamData.type || (teamId <= 3 ? 'mal' : 'str'),
+            members: teamData.members || [],
+            notifications: teamData.notifications || [],
+            tasks: teamData.tasks || [],
+            absences: teamData.absences || [],
+            updated_at: new Date().toISOString()
+        };
+        
+        return await window.supabaseClient?.saveTeam(teamId, teamToSave);
     },
 
     // Добавить участника
     async addMember(teamId, memberData) {
-        const team = await this.getTeam(teamId);
-        if (!team) return false;
-
-        const newMember = {
-            id: Date.now().toString(),
-            name: memberData.name,
-            callSign: memberData.callSign,
-            rank: memberData.rank,
-            role: memberData.role || 'soldier',
-            dateAdded: new Date().toISOString()
-        };
-
-        if (!team.members) team.members = [];
-        team.members.push(newMember);
+        console.log('Додаємо учасника:', teamId, memberData);
         
-        await this.saveTeam(teamId, team);
-        return true;
+        try {
+            const team = await this.getTeam(teamId);
+            console.log('Команда отримана:', team);
+            
+            // Генерируем ID для нового участника
+            const newMember = {
+                id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+                name: memberData.name || '',
+                callSign: memberData.callSign || '',
+                rank: memberData.rank || '',
+                role: memberData.role || 'soldier',
+                dateAdded: new Date().toISOString()
+            };
+
+            console.log('Новий учасник:', newMember);
+            
+            // Инициализируем массив members если его нет
+            if (!team.members) {
+                team.members = [];
+            }
+            
+            // Добавляем нового участника
+            team.members.push(newMember);
+            
+            console.log('Оновлена команда:', team);
+            
+            // Сохраняем команду
+            const result = await this.saveTeam(teamId, team);
+            console.log('Результат збереження:', result);
+            
+            return true;
+            
+        } catch (error) {
+            console.error('Помилка при додаванні учасника:', error);
+            return false;
+        }
     },
 
     // Удалить участника
@@ -283,9 +359,9 @@ const TeamManager = {
         if (!team) return false;
 
         const newNotification = {
-            id: Date.now().toString(),
-            title: notificationData.title,
-            message: notificationData.message,
+            id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+            title: notificationData.title || '',
+            message: notificationData.message || '',
             date: new Date().toISOString(),
             author: author
         };
@@ -303,9 +379,9 @@ const TeamManager = {
         if (!team) return false;
 
         const newTask = {
-            id: Date.now().toString(),
-            title: taskData.title,
-            description: taskData.description,
+            id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+            title: taskData.title || '',
+            description: taskData.description || '',
             date: new Date().toISOString(),
             completed: false
         };
@@ -323,10 +399,10 @@ const TeamManager = {
         if (!team) return false;
 
         const newAbsence = {
-            id: Date.now().toString(),
-            memberName: absenceData.memberName,
-            date: absenceData.date,
-            reason: absenceData.reason,
+            id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+            memberName: absenceData.memberName || '',
+            date: absenceData.date || '',
+            reason: absenceData.reason || '',
             reportedDate: new Date().toISOString()
         };
 
@@ -336,20 +412,30 @@ const TeamManager = {
         await this.saveTeam(teamId, team);
         
         // Автоматическое удаление через день
-        const absenceDate = new Date(absenceData.date);
-        const deleteDate = new Date(absenceDate);
-        deleteDate.setDate(deleteDate.getDate() + 1);
-        deleteDate.setHours(23, 59, 0, 0);
-        
-        const timeUntilDelete = deleteDate.getTime() - Date.now();
-        if (timeUntilDelete > 0) {
-            setTimeout(async () => {
-                const currentTeam = await this.getTeam(teamId);
-                if (currentTeam && currentTeam.absences) {
-                    currentTeam.absences = currentTeam.absences.filter(a => a.id !== newAbsence.id);
-                    await this.saveTeam(teamId, currentTeam);
+        try {
+            const absenceDate = new Date(absenceData.date);
+            if (!isNaN(absenceDate.getTime())) {
+                const deleteDate = new Date(absenceDate);
+                deleteDate.setDate(deleteDate.getDate() + 1);
+                deleteDate.setHours(23, 59, 0, 0);
+                
+                const timeUntilDelete = deleteDate.getTime() - Date.now();
+                if (timeUntilDelete > 0) {
+                    setTimeout(async () => {
+                        try {
+                            const currentTeam = await this.getTeam(teamId);
+                            if (currentTeam && currentTeam.absences) {
+                                currentTeam.absences = currentTeam.absences.filter(a => a.id !== newAbsence.id);
+                                await this.saveTeam(teamId, currentTeam);
+                            }
+                        } catch (e) {
+                            console.error('Помилка автоматичного видалення відсутності:', e);
+                        }
+                    }, timeUntilDelete);
                 }
-            }, timeUntilDelete);
+            }
+        } catch (e) {
+            console.error('Помилка встановлення таймера для видалення:', e);
         }
         
         return true;
@@ -357,40 +443,49 @@ const TeamManager = {
 
     // Глобальные уведомления
     async getGlobalNotifications() {
-        return await window.supabaseClient?.getGlobalNotifications();
+        const notifications = await window.supabaseClient?.getGlobalNotifications();
+        return notifications || [];
     },
 
     async addGlobalNotification(notificationData, author = 'Адміністратор') {
-        return await window.supabaseClient?.addGlobalNotification(notificationData, author);
+        const result = await window.supabaseClient?.addGlobalNotification(notificationData, author);
+        return result || false;
     },
 
     async deleteGlobalNotification(id) {
-        return await window.supabaseClient?.deleteGlobalNotification(id);
+        const result = await window.supabaseClient?.deleteGlobalNotification(id);
+        return result || false;
     },
 
     // Сообщения админу
     async getAdminNotifications() {
-        return await window.supabaseClient?.getAdminMessages();
+        const notifications = await window.supabaseClient?.getAdminMessages();
+        return notifications || [];
     },
 
     async addAdminNotification(message, fromTeam) {
-        return await window.supabaseClient?.addAdminMessage(message, fromTeam);
+        const result = await window.supabaseClient?.addAdminMessage(message, fromTeam);
+        return result || false;
     },
 
     async markNotificationAsRead(id) {
-        return await window.supabaseClient?.markMessageAsRead(id);
+        const result = await window.supabaseClient?.markMessageAsRead(id);
+        return result || false;
     },
 
     async markAllNotificationsAsRead() {
-        return await window.supabaseClient?.markAllMessagesAsRead();
+        const result = await window.supabaseClient?.markAllMessagesAsRead();
+        return result || false;
     },
 
     async deleteAdminNotification(id) {
-        return await window.supabaseClient?.deleteAdminMessage(id);
+        const result = await window.supabaseClient?.deleteAdminMessage(id);
+        return result || false;
     },
 
     async getUnreadCount() {
-        return await window.supabaseClient?.getUnreadCount();
+        const count = await window.supabaseClient?.getUnreadCount();
+        return count || 0;
     }
 };
 
@@ -400,7 +495,7 @@ function sendToAdmin(message, fromTeam) {
     return TeamManager.addAdminNotification(message, fromTeam);
 }
 
-// Модальное окно (упрощенное)
+// Модальное окно
 const Modal = {
     show(title, content, buttons = []) {
         return new Promise((resolve) => {
@@ -469,6 +564,155 @@ const Modal = {
                 modal.appendChild(actions);
             }
             
+            overlay.appendChild(modal);
+            document.body.appendChild(overlay);
+            
+            // Закрытие по клику на оверлей
+            overlay.onclick = (e) => {
+                if (e.target === overlay) {
+                    document.body.removeChild(overlay);
+                    resolve(null);
+                }
+            };
+        });
+    },
+    
+    // Форма для модального окна
+    showForm(title, fields) {
+        return new Promise((resolve) => {
+            // Создаем HTML формы
+            let formHTML = '';
+            fields.forEach(field => {
+                if (field.type === 'select') {
+                    formHTML += `
+                        <div style="margin-bottom: 16px;">
+                            <label style="display: block; margin-bottom: 6px; color: #e0e1dd; font-size: 14px;">
+                                ${field.label}
+                            </label>
+                            <select name="${field.name}" 
+                                    style="width: 100%; padding: 10px; background: rgba(255,255,255,0.05); 
+                                           border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; 
+                                           color: white; font-size: 14px;" ${field.required ? 'required' : ''}>
+                                ${field.options.map(opt => `<option value="${opt.value}">${opt.text}</option>`).join('')}
+                            </select>
+                        </div>
+                    `;
+                } else if (field.type === 'textarea') {
+                    formHTML += `
+                        <div style="margin-bottom: 16px;">
+                            <label style="display: block; margin-bottom: 6px; color: #e0e1dd; font-size: 14px;">
+                                ${field.label}
+                            </label>
+                            <textarea name="${field.name}" 
+                                      rows="${field.rows || 3}"
+                                      placeholder="${field.placeholder || ''}"
+                                      style="width: 100%; padding: 10px; background: rgba(255,255,255,0.05); 
+                                             border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; 
+                                             color: white; font-size: 14px; resize: vertical;" 
+                                      ${field.required ? 'required' : ''}></textarea>
+                        </div>
+                    `;
+                } else {
+                    formHTML += `
+                        <div style="margin-bottom: 16px;">
+                            <label style="display: block; margin-bottom: 6px; color: #e0e1dd; font-size: 14px;">
+                                ${field.label}
+                            </label>
+                            <input type="${field.type || 'text'}" 
+                                   name="${field.name}" 
+                                   placeholder="${field.placeholder || ''}"
+                                   style="width: 100%; padding: 10px; background: rgba(255,255,255,0.05); 
+                                          border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; 
+                                          color: white; font-size: 14px;" 
+                                   ${field.required ? 'required' : ''}>
+                        </div>
+                    `;
+                }
+            });
+            
+            // Создаем оверлей
+            const overlay = document.createElement('div');
+            overlay.style.cssText = `
+                position: fixed;
+                top: 0; left: 0; right: 0; bottom: 0;
+                background: rgba(0,0,0,0.8);
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                z-index: 1000;
+                padding: 20px;
+            `;
+            
+            // Создаем модальное окно с формой
+            const modal = document.createElement('div');
+            modal.style.cssText = `
+                background: #1a1f2e;
+                border-radius: 16px;
+                padding: 24px;
+                max-width: 500px;
+                width: 100%;
+                border: 1px solid #29c4ff;
+                box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            `;
+            
+            // Заголовок
+            const titleEl = document.createElement('h3');
+            titleEl.textContent = title;
+            titleEl.style.cssText = 'color: #29c4ff; margin-bottom: 20px;';
+            modal.appendChild(titleEl);
+            
+            // Форма
+            const form = document.createElement('form');
+            form.innerHTML = formHTML;
+            modal.appendChild(form);
+            
+            // Кнопки
+            const actions = document.createElement('div');
+            actions.style.cssText = 'display: flex; gap: 10px; margin-top: 20px;';
+            
+            // Кнопка Отмена
+            const cancelBtn = document.createElement('button');
+            cancelBtn.textContent = 'Скасувати';
+            cancelBtn.type = 'button';
+            cancelBtn.style.cssText = `
+                flex: 1;
+                padding: 12px;
+                background: #415a77;
+                border: none;
+                border-radius: 8px;
+                color: white;
+                cursor: pointer;
+                font-weight: 500;
+            `;
+            cancelBtn.onclick = () => {
+                document.body.removeChild(overlay);
+                resolve(null);
+            };
+            actions.appendChild(cancelBtn);
+            
+            // Кнопка Сохранить
+            const saveBtn = document.createElement('button');
+            saveBtn.textContent = 'Зберегти';
+            saveBtn.type = 'button';
+            saveBtn.style.cssText = `
+                flex: 1;
+                padding: 12px;
+                background: linear-gradient(135deg, #29c4ff, #9d4edd);
+                border: none;
+                border-radius: 8px;
+                color: white;
+                cursor: pointer;
+                font-weight: 500;
+            `;
+            saveBtn.onclick = () => {
+                const formData = new FormData(form);
+                const data = Object.fromEntries(formData.entries());
+                document.body.removeChild(overlay);
+                resolve(data);
+            };
+            actions.appendChild(saveBtn);
+            
+            modal.appendChild(actions);
             overlay.appendChild(modal);
             document.body.appendChild(overlay);
             
