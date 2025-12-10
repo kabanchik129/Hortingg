@@ -1,15 +1,9 @@
-// supabase-config.js - ПРОСТОЙ ФАЙЛ
-console.log('Завантаження конфігурації...');
+// supabase-config.js
 
-// Конфигурация Supabase (замени на свои реальные данные)
-window.SUPABASE_CONFIG = {
-    url: 'https://zgumvczkfaracjqvdjzm.supabase.co',  // Замени на свой URL
-    key: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpndW12Y3prZmFyYWNqcXZkanptIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjUyODY0NjcsImV4cCI6MjA4MDg2MjQ2N30.H8yUfSceeXgrm75ra5ORlj9on8t80Y8APzH4k3OeF1o'  // Замени на свой ключ
-};
+import { createClient } from '@supabase/supabase-js'
 
-// Если Supabase SDK не загружен, выводим предупреждение
-if (typeof supabase === 'undefined') {
-    console.warn('Supabase SDK не завантажений! Перевірте підключення в index.html');
-}
+// ⚠️ ВСТАВЬ СВОИ ДАННЫЕ
+const SUPABASE_URL = "https://zgumvczkfaracjqvdjzm.supabase.co"
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpndW12Y3prZmFyYWNqcXZkanptIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjUyODY0NjcsImV4cCI6MjA4MDg2MjQ2N30.H8yUfSceeXgrm75ra5ORlj9on8t80Y8APzH4k3OeF1o"
 
-console.log('Конфігурація завантажена');
+export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
