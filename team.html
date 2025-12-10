@@ -173,7 +173,12 @@
         </main>
     </div>
 
+    <!-- Подключаем скрипты -->
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+    <script src="supabase-config.js"></script>
+    <script src="supabase-client.js"></script>
     <script src="script.js"></script>
+    
     <script>
         let currentUser = null;
         let currentTeam = null;
@@ -181,7 +186,9 @@
         let isAdminView = false;
 
         // Инициализация
-        function initTeamPage() {
+        async function initTeamPage() {
+            console.log('Ініціалізація сторінки команди...');
+            
             // Проверяем, не админ ли это просматривает команду
             const adminView = sessionStorage.getItem('horting_admin_view');
             const viewTeam = sessionStorage.getItem('horting_view_team');
@@ -209,8 +216,11 @@
             } else {
                 // Обычный пользователь
                 isAdminView = false;
-                currentUser = checkAuth();
-                if (!currentUser) return;
+                currentUser = checkAuth('user');
+                if (!currentUser) {
+                    console.log('Користувач не авторизований');
+                    return;
+                }
                 
                 if (currentUser.role === 'admin') {
                     window.location.href = 'dashboard.html';
@@ -232,19 +242,20 @@
             }
             
             // Загружаем данные команды
-            loadTeamData();
+            await loadTeamData();
             
             // Показываем/скрываем элементы управления
             if (canEdit) {
                 document.getElementById('addNotificationSection').style.display = 'block';
                 document.getElementById('addMemberSection').style.display = 'block';
                 document.getElementById('addTaskSection').style.display = 'block';
+                console.log('Користувач може редагувати');
+            } else {
+                console.log('Користувач не може редагувати');
             }
             
             // Загружаем тренировки
             loadNextTrainings();
-            // Загружаем обращения
-            loadMyMessages();
             
             // Устанавливаем завтрашнюю дату по умолчанию
             const tomorrow = new Date();
@@ -253,268 +264,319 @@
             
             // Устанавливаем имя из данных пользователя
             if (!isAdminView) {
-                const team = TeamManager.getTeam(currentUser.teamId);
-                const member = team.members.find(m => m.callSign.includes('Командир') || m.callSign.includes('Заступник') || m.callSign);
-                if (member) {
-                    document.getElementById('absenceName').value = member.name;
+                const team = await TeamManager.getTeam(currentUser.teamId);
+                if (team && team.members) {
+                    const member = team.members.find(m => m.callSign.includes('Командир') || m.callSign.includes('Заступник') || m.callSign);
+                    if (member) {
+                        document.getElementById('absenceName').value = member.name;
+                    }
                 }
             }
             
             document.getElementById('teamName').textContent = 
                 CONFIG.teams[currentUser.teamId].name;
+                
+            console.log('Сторінка команди ініціалізована');
         }
 
-        function loadTeamData() {
-            currentTeam = TeamManager.getTeam(currentUser.teamId);
-            
-            loadTeamMembers();
-            loadTeamNotifications();
-            loadAllTeamNotifications();
-            loadGlobalNotificationsForTeam();
-            loadTasks();
-            loadAbsences();
-        }
-
-        function loadTeamMembers() {
-            const container = document.getElementById('membersList');
-            
-            if (!currentTeam.members.length) {
-                container.innerHTML = '<p style="color: rgba(255,255,255,0.5); text-align: center;">Ще немає членів команди</p>';
-                return;
+        async function loadTeamData() {
+            try {
+                currentTeam = await TeamManager.getTeam(currentUser.teamId);
+                console.log('Дані команди завантажені:', currentTeam);
+                
+                await loadTeamMembers();
+                await loadTeamNotifications();
+                await loadAllTeamNotifications();
+                await loadGlobalNotificationsForTeam();
+                await loadTasks();
+                await loadAbsences();
+                await loadMyMessages();
+            } catch (error) {
+                console.error('Помилка завантаження даних команди:', error);
             }
-            
-            container.innerHTML = currentTeam.members.map(member => `
-                <div class="enhanced-card" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-                    <div>
-                        <strong style="color: #29c4ff; font-size: 1.1rem;">${member.callSign}</strong>
-                        <p style="margin: 5px 0; color: rgba(255,255,255,0.8);">${member.name}</p>
-                        <small style="color: rgba(255,255,255,0.5);">${member.rank}</small>
-                    </div>
-                    <div style="display: flex; align-items: center; gap: 10px;">
-                        <span class="role-badge ${member.role === 'command' ? 'role-kam' : 
-                                                  member.role === 'deputy' ? 'role-zam' : ''}">
-                            ${member.role === 'command' ? 'Командир' : 
-                             member.role === 'deputy' ? 'Заступник' : 'Боець'}
-                        </span>
-                        ${canEdit ? `
-                            <button onclick="removeMember('${member.id}')" 
-                                    class="btn-secondary" 
-                                    style="padding: 6px 12px; font-size: 0.8rem; background: rgba(255,107,107,0.2); border-color: #ff6b6b; color: #ff6b6b;">
-                                <i class="fas fa-trash"></i>
-                            </button>
-                        ` : ''}
-                    </div>
-                </div>
-            `).join('');
         }
 
-        function loadTeamNotifications() {
-            const container = document.getElementById('teamNotifications');
-            const recent = currentTeam.notifications.slice(-5).reverse();
-            
-            if (!recent.length) {
-                container.innerHTML = '<p style="color: rgba(255,255,255,0.5); text-align: center;">Ще немає сповіщень</p>';
-                return;
-            }
-            
-            container.innerHTML = recent.map(notif => `
-                <div class="enhanced-card">
-                    <strong style="color: #29c4ff; font-size: 1.1rem;">${notif.title}</strong>
-                    <p style="margin: 10px 0; color: rgba(255,255,255,0.8);">${notif.message}</p>
-                    <div style="color: rgba(255,255,255,0.5); font-size: 0.9rem; margin-top: 10px;">
-                        <i class="fas fa-calendar"></i> ${formatDate(notif.date).split(' ')[0]} • 
-                        <i class="fas fa-user"></i> ${notif.author}
-                    </div>
-                </div>
-            `).join('');
-        }
-
-        function loadAllTeamNotifications() {
-            const container = document.getElementById('allTeamNotifications');
-            const all = [...currentTeam.notifications].reverse();
-            
-            if (!all.length) {
-                container.innerHTML = '<p style="color: rgba(255,255,255,0.5); text-align: center;">Ще немає сповіщень</p>';
-                return;
-            }
-            
-            container.innerHTML = all.map(notif => `
-                <div class="enhanced-card">
-                    <div style="display: flex; justify-content: space-between; align-items: start;">
-                        <div style="flex: 1;">
-                            <strong style="color: #29c4ff; font-size: 1.1rem;">${notif.title}</strong>
-                            <p style="margin: 10px 0; color: rgba(255,255,255,0.8);">${notif.message}</p>
-                            <div style="color: rgba(255,255,255,0.5); font-size: 0.9rem; margin-top: 10px;">
-                                <i class="fas fa-calendar"></i> ${formatDate(notif.date).split(' ')[0]} • 
-                                <i class="fas fa-user"></i> ${notif.author}
-                            </div>
+        async function loadTeamMembers() {
+            try {
+                const container = document.getElementById('membersList');
+                const members = currentTeam.members || [];
+                
+                if (!members.length) {
+                    container.innerHTML = '<p style="color: rgba(255,255,255,0.5); text-align: center;">Ще немає членів команди</p>';
+                    return;
+                }
+                
+                container.innerHTML = members.map(member => `
+                    <div class="enhanced-card" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                        <div>
+                            <strong style="color: #29c4ff; font-size: 1.1rem;">${member.callSign || ''}</strong>
+                            <p style="margin: 5px 0; color: rgba(255,255,255,0.8);">${member.name || ''}</p>
+                            <small style="color: rgba(255,255,255,0.5);">${member.rank || ''}</small>
                         </div>
-                        ${canEdit ? `
-                            <div>
-                                <button onclick="deleteNotification('${notif.id}')" 
+                        <div style="display: flex; align-items: center; gap: 10px;">
+                            <span class="role-badge ${member.role === 'command' ? 'role-kam' : 
+                                                      member.role === 'deputy' ? 'role-zam' : ''}">
+                                ${member.role === 'command' ? 'Командир' : 
+                                 member.role === 'deputy' ? 'Заступник' : 'Боець'}
+                            </span>
+                            ${canEdit ? `
+                                <button onclick="removeMember('${member.id}')" 
                                         class="btn-secondary" 
                                         style="padding: 6px 12px; font-size: 0.8rem; background: rgba(255,107,107,0.2); border-color: #ff6b6b; color: #ff6b6b;">
                                     <i class="fas fa-trash"></i>
                                 </button>
-                            </div>
-                        ` : ''}
-                    </div>
-                </div>
-            `).join('');
-        }
-
-        function loadGlobalNotificationsForTeam() {
-            const allNotifications = TeamManager.getGlobalNotifications();
-            const container = document.getElementById('globalNotificationsTeam');
-            
-            // Фильтруем уведомления для этой команды
-            const teamNotifications = allNotifications.filter(notif => 
-                !notif.targetTeams || notif.targetTeams.includes(currentUser.teamId.toString())
-            );
-            
-            const recent = teamNotifications.slice(-3).reverse();
-            
-            if (!recent.length) {
-                container.innerHTML = '<p style="color: rgba(255,255,255,0.5); text-align: center;">Немає загальних сповіщень</p>';
-                return;
-            }
-            
-            container.innerHTML = recent.map(notif => `
-                <div class="enhanced-card" style="border-left: 4px solid #29c4ff;">
-                    <strong style="color: #29c4ff; font-size: 1.1rem;">${notif.title}</strong>
-                    <p style="margin: 10px 0; color: rgba(255,255,255,0.8);">${notif.message}</p>
-                    <div style="color: rgba(255,255,255,0.5); font-size: 0.9rem; margin-top: 10px;">
-                        <i class="fas fa-calendar"></i> ${formatDate(notif.date).split(' ')[0]} • 
-                        <i class="fas fa-user"></i> ${notif.author}
-                    </div>
-                </div>
-            `).join('');
-        }
-
-        function loadTasks() {
-            const container = document.getElementById('tasksList');
-            const tasks = currentTeam.tasks;
-            
-            if (!tasks.length) {
-                container.innerHTML = '<p style="color: rgba(255,255,255,0.5); text-align: center;">Ще немає завдань</p>';
-                return;
-            }
-            
-            container.innerHTML = tasks.map(task => `
-                <div class="enhanced-card" style="border-left: 4px solid ${task.completed ? '#1a936f' : '#ff9e00'}">
-                    <div style="display: flex; justify-content: space-between; align-items: start;">
-                        <div style="flex: 1;">
-                            <strong style="color: ${task.completed ? '#1a936f' : '#29c4ff'}; font-size: 1.1rem;">
-                                ${task.title}
-                            </strong>
-                            <p style="margin: 10px 0; color: rgba(255,255,255,0.8);">${task.description}</p>
-                            <div style="color: rgba(255,255,255,0.5); font-size: 0.9rem; margin-top: 10px;">
-                                <i class="fas fa-calendar"></i> ${formatDate(task.date).split(' ')[0]}
-                            </div>
+                            ` : ''}
                         </div>
-                        ${canEdit ? `
-                            <div style="display: flex; flex-direction: column; gap: 5px;">
-                                <button onclick="toggleTask('${task.id}')" 
-                                        class="${task.completed ? 'btn-secondary' : 'btn-primary'}" 
-                                        style="padding: 6px 12px; font-size: 0.8rem; white-space: nowrap;">
-                                    <i class="fas ${task.completed ? 'fa-redo' : 'fa-check'}"></i>
-                                    ${task.completed ? 'Відновити' : 'Виконано'}
-                                </button>
-                                <button onclick="deleteTask('${task.id}')" 
-                                        class="btn-secondary" 
-                                        style="padding: 6px 12px; font-size: 0.8rem; background: rgba(255,107,107,0.2); border-color: #ff6b6b; color: #ff6b6b;">
-                                    <i class="fas fa-trash"></i> Видалити
-                                </button>
-                            </div>
-                        ` : ''}
                     </div>
-                </div>
-            `).join('');
+                `).join('');
+            } catch (error) {
+                console.error('Помилка завантаження членів команди:', error);
+            }
         }
 
-        function loadAbsences() {
-            const container = document.getElementById('absencesList');
-            const absences = currentTeam.absences;
-            
-            if (!absences.length) {
-                container.innerHTML = '<p style="color: rgba(255,255,255,0.5); text-align: center;">Немає запланованих відсутностей</p>';
-                return;
-            }
-            
-            container.innerHTML = absences.map(abs => `
-                <div class="enhanced-card" style="border-left: 4px solid #ff6b6b;">
-                    <div style="display: flex; justify-content: space-between; align-items: start;">
-                        <div style="flex: 1;">
-                            <strong style="color: #ff6b6b; font-size: 1.1rem;">${abs.memberName}</strong>
-                            <p style="margin: 5px 0; color: rgba(255,255,255,0.8);">Не буде: ${abs.date}</p>
-                            <small style="color: rgba(255,255,255,0.5);">Причина: ${abs.reason}</small>
+        async function loadTeamNotifications() {
+            try {
+                const container = document.getElementById('teamNotifications');
+                const notifications = currentTeam.notifications || [];
+                const recent = notifications.slice(-5).reverse();
+                
+                if (!recent.length) {
+                    container.innerHTML = '<p style="color: rgba(255,255,255,0.5); text-align: center;">Ще немає сповіщень</p>';
+                    return;
+                }
+                
+                container.innerHTML = recent.map(notif => `
+                    <div class="enhanced-card">
+                        <strong style="color: #29c4ff; font-size: 1.1rem;">${notif.title || ''}</strong>
+                        <p style="margin: 10px 0; color: rgba(255,255,255,0.8);">${notif.message || ''}</p>
+                        <div style="color: rgba(255,255,255,0.5); font-size: 0.9rem; margin-top: 10px;">
+                            <i class="fas fa-calendar"></i> ${formatDate(notif.date).split(' ')[0]} • 
+                            <i class="fas fa-user"></i> ${notif.author || ''}
                         </div>
-                        ${canEdit ? `
-                            <div>
-                                <button onclick="deleteAbsence('${abs.id}')" 
-                                        class="btn-secondary" 
-                                        style="padding: 6px 12px; font-size: 0.8rem; background: rgba(255,107,107,0.2); border-color: #ff6b6b; color: #ff6b6b;">
-                                    <i class="fas fa-trash"></i>
-                                </button>
-                            </div>
-                        ` : ''}
                     </div>
-                </div>
-            `).join('');
+                `).join('');
+            } catch (error) {
+                console.error('Помилка завантаження сповіщень:', error);
+            }
         }
 
-        function loadMyMessages() {
-            const container = document.getElementById('myMessagesList');
-            const notifications = TeamManager.getAdminNotifications();
-            
-            // Фильтруем сообщения от этой команды
-            const myMessages = notifications.filter(n => n.fromTeam == currentUser.teamId);
-            
-            if (!myMessages.length) {
-                container.innerHTML = '<p style="color: rgba(255,255,255,0.5); text-align: center;">Ви ще не надсилали звернень</p>';
-                return;
-            }
-            
-            container.innerHTML = myMessages.reverse().map(msg => `
-                <div class="enhanced-card" style="border-left: 4px solid #9d4edd;">
-                    <strong style="color: #9d4edd; font-size: 1.1rem;">
-                        ${msg.message.split(']')[0]}]
-                    </strong>
-                    <p style="margin: 10px 0; color: rgba(255,255,255,0.8);">${msg.message.split('] ')[1] || msg.message}</p>
-                    <div style="color: rgba(255,255,255,0.5); font-size: 0.9rem; margin-top: 10px;">
-                        <i class="fas fa-calendar"></i> ${formatDate(msg.date).split(' ')[0]}
-                        ${msg.read ? 
-                            '<span style="color: #1a936f; margin-left: 10px;"><i class="fas fa-check"></i> Прочитано</span>' : 
-                            '<span style="color: #ff9e00; margin-left: 10px;"><i class="fas fa-clock"></i> Очікує розгляду</span>'
-                        }
+        async function loadAllTeamNotifications() {
+            try {
+                const container = document.getElementById('allTeamNotifications');
+                const notifications = currentTeam.notifications || [];
+                const all = [...notifications].reverse();
+                
+                if (!all.length) {
+                    container.innerHTML = '<p style="color: rgba(255,255,255,0.5); text-align: center;">Ще немає сповіщень</p>';
+                    return;
+                }
+                
+                container.innerHTML = all.map(notif => `
+                    <div class="enhanced-card">
+                        <div style="display: flex; justify-content: space-between; align-items: start;">
+                            <div style="flex: 1;">
+                                <strong style="color: #29c4ff; font-size: 1.1rem;">${notif.title || ''}</strong>
+                                <p style="margin: 10px 0; color: rgba(255,255,255,0.8);">${notif.message || ''}</p>
+                                <div style="color: rgba(255,255,255,0.5); font-size: 0.9rem; margin-top: 10px;">
+                                    <i class="fas fa-calendar"></i> ${formatDate(notif.date).split(' ')[0]} • 
+                                    <i class="fas fa-user"></i> ${notif.author || ''}
+                                </div>
+                            </div>
+                            ${canEdit ? `
+                                <div>
+                                    <button onclick="deleteNotification('${notif.id}')" 
+                                            class="btn-secondary" 
+                                            style="padding: 6px 12px; font-size: 0.8rem; background: rgba(255,107,107,0.2); border-color: #ff6b6b; color: #ff6b6b;">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </div>
+                            ` : ''}
+                        </div>
                     </div>
-                </div>
-            `).join('');
+                `).join('');
+            } catch (error) {
+                console.error('Помилка завантаження всіх сповіщень:', error);
+            }
+        }
+
+        async function loadGlobalNotificationsForTeam() {
+            try {
+                const allNotifications = await TeamManager.getGlobalNotifications();
+                const container = document.getElementById('globalNotificationsTeam');
+                
+                // Фильтруем уведомления для этой команды
+                const teamNotifications = allNotifications.filter(notif => 
+                    !notif.targetTeams || notif.targetTeams.includes(currentUser.teamId.toString())
+                );
+                
+                const recent = teamNotifications.slice(-3).reverse();
+                
+                if (!recent.length) {
+                    container.innerHTML = '<p style="color: rgba(255,255,255,0.5); text-align: center;">Немає загальних сповіщень</p>';
+                    return;
+                }
+                
+                container.innerHTML = recent.map(notif => `
+                    <div class="enhanced-card" style="border-left: 4px solid #29c4ff;">
+                        <strong style="color: #29c4ff; font-size: 1.1rem;">${notif.title || ''}</strong>
+                        <p style="margin: 10px 0; color: rgba(255,255,255,0.8);">${notif.message || ''}</p>
+                        <div style="color: rgba(255,255,255,0.5); font-size: 0.9rem; margin-top: 10px;">
+                            <i class="fas fa-calendar"></i> ${formatDate(notif.date || notif.created_at).split(' ')[0]} • 
+                            <i class="fas fa-user"></i> ${notif.author || ''}
+                        </div>
+                    </div>
+                `).join('');
+            } catch (error) {
+                console.error('Помилка завантаження глобальних сповіщень:', error);
+            }
+        }
+
+        async function loadTasks() {
+            try {
+                const container = document.getElementById('tasksList');
+                const tasks = currentTeam.tasks || [];
+                
+                if (!tasks.length) {
+                    container.innerHTML = '<p style="color: rgba(255,255,255,0.5); text-align: center;">Ще немає завдань</p>';
+                    return;
+                }
+                
+                container.innerHTML = tasks.map(task => `
+                    <div class="enhanced-card" style="border-left: 4px solid ${task.completed ? '#1a936f' : '#ff9e00'}">
+                        <div style="display: flex; justify-content: space-between; align-items: start;">
+                            <div style="flex: 1;">
+                                <strong style="color: ${task.completed ? '#1a936f' : '#29c4ff'}; font-size: 1.1rem;">
+                                    ${task.title || ''}
+                                </strong>
+                                <p style="margin: 10px 0; color: rgba(255,255,255,0.8);">${task.description || ''}</p>
+                                <div style="color: rgba(255,255,255,0.5); font-size: 0.9rem; margin-top: 10px;">
+                                    <i class="fas fa-calendar"></i> ${formatDate(task.date).split(' ')[0]}
+                                </div>
+                            </div>
+                            ${canEdit ? `
+                                <div style="display: flex; flex-direction: column; gap: 5px;">
+                                    <button onclick="toggleTask('${task.id}')" 
+                                            class="${task.completed ? 'btn-secondary' : 'btn-primary'}" 
+                                            style="padding: 6px 12px; font-size: 0.8rem; white-space: nowrap;">
+                                        <i class="fas ${task.completed ? 'fa-redo' : 'fa-check'}"></i>
+                                        ${task.completed ? 'Відновити' : 'Виконано'}
+                                    </button>
+                                    <button onclick="deleteTask('${task.id}')" 
+                                            class="btn-secondary" 
+                                            style="padding: 6px 12px; font-size: 0.8rem; background: rgba(255,107,107,0.2); border-color: #ff6b6b; color: #ff6b6b;">
+                                        <i class="fas fa-trash"></i> Видалити
+                                    </button>
+                                </div>
+                            ` : ''}
+                        </div>
+                    </div>
+                `).join('');
+            } catch (error) {
+                console.error('Помилка завантаження завдань:', error);
+            }
+        }
+
+        async function loadAbsences() {
+            try {
+                const container = document.getElementById('absencesList');
+                const absences = currentTeam.absences || [];
+                
+                if (!absences.length) {
+                    container.innerHTML = '<p style="color: rgba(255,255,255,0.5); text-align: center;">Немає запланованих відсутностей</p>';
+                    return;
+                }
+                
+                container.innerHTML = absences.map(abs => `
+                    <div class="enhanced-card" style="border-left: 4px solid #ff6b6b;">
+                        <div style="display: flex; justify-content: space-between; align-items: start;">
+                            <div style="flex: 1;">
+                                <strong style="color: #ff6b6b; font-size: 1.1rem;">${abs.memberName || ''}</strong>
+                                <p style="margin: 5px 0; color: rgba(255,255,255,0.8);">Не буде: ${abs.date || ''}</p>
+                                <small style="color: rgba(255,255,255,0.5);">Причина: ${abs.reason || ''}</small>
+                            </div>
+                            ${canEdit ? `
+                                <div>
+                                    <button onclick="deleteAbsence('${abs.id}')" 
+                                            class="btn-secondary" 
+                                            style="padding: 6px 12px; font-size: 0.8rem; background: rgba(255,107,107,0.2); border-color: #ff6b6b; color: #ff6b6b;">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                </div>
+                            ` : ''}
+                        </div>
+                    </div>
+                `).join('');
+            } catch (error) {
+                console.error('Помилка завантаження відсутностей:', error);
+            }
+        }
+
+        async function loadMyMessages() {
+            try {
+                const container = document.getElementById('myMessagesList');
+                const notifications = await TeamManager.getAdminNotifications();
+                
+                // Фильтруем сообщения от этой команды
+                const myMessages = notifications.filter(n => n.fromTeam == currentUser.teamId || n.from_team == currentUser.teamId);
+                
+                if (!myMessages.length) {
+                    container.innerHTML = '<p style="color: rgba(255,255,255,0.5); text-align: center;">Ви ще не надсилали звернень</p>';
+                    return;
+                }
+                
+                container.innerHTML = myMessages.reverse().map(msg => {
+                    const messageText = msg.message || '';
+                    const typeMatch = messageText.match(/^\[(.*?)\]/);
+                    const type = typeMatch ? typeMatch[1] : 'Звернення';
+                    const content = typeMatch ? messageText.replace(typeMatch[0] + ' ', '') : messageText;
+                    
+                    return `
+                    <div class="enhanced-card" style="border-left: 4px solid #9d4edd;">
+                        <strong style="color: #9d4edd; font-size: 1.1rem;">
+                            ${type}
+                        </strong>
+                        <p style="margin: 10px 0; color: rgba(255,255,255,0.8);">${content}</p>
+                        <div style="color: rgba(255,255,255,0.5); font-size: 0.9rem; margin-top: 10px;">
+                            <i class="fas fa-calendar"></i> ${formatDate(msg.date || msg.created_at).split(' ')[0]}
+                            ${(msg.read || msg.is_read) ? 
+                                '<span style="color: #1a936f; margin-left: 10px;"><i class="fas fa-check"></i> Прочитано</span>' : 
+                                '<span style="color: #ff9e00; margin-left: 10px;"><i class="fas fa-clock"></i> Очікує розгляду</span>'
+                            }
+                        </div>
+                    </div>
+                `}).join('');
+            } catch (error) {
+                console.error('Помилка завантаження моїх повідомлень:', error);
+            }
         }
 
         function loadNextTrainings() {
-            const container = document.getElementById('nextTrainings');
-            const trainings = getNextTrainings(3);
-            
-            if (!trainings.length) {
-                container.innerHTML = '<p style="color: rgba(255,255,255,0.5); text-align: center;">Немає запланованих занять</p>';
-                return;
-            }
-            
-            container.innerHTML = trainings.map(training => `
-                <div class="enhanced-card" style="border-left: 4px solid #00bbf9;">
-                    <strong style="color: #00bbf9; font-size: 1.1rem;">
-                        ${training.day.charAt(0).toUpperCase() + training.day.slice(1)}
-                    </strong>
-                    <p style="margin: 10px 0; color: rgba(255,255,255,0.8);">Дата: ${training.date}</p>
-                    <div style="color: rgba(255,255,255,0.5); font-size: 0.9rem; margin-top: 10px;">
-                        ${training.isToday ? 
-                            '<span style="color: #ffd60a; font-weight: bold;"><i class="fas fa-star"></i> Сьогодні</span>' : 
-                            '<span><i class="fas fa-clock"></i> ' + training.time + '</span>'
-                        }
+            try {
+                const container = document.getElementById('nextTrainings');
+                const trainings = getNextTrainings(3);
+                
+                if (!trainings.length) {
+                    container.innerHTML = '<p style="color: rgba(255,255,255,0.5); text-align: center;">Немає запланованих занять</p>';
+                    return;
+                }
+                
+                container.innerHTML = trainings.map(training => `
+                    <div class="enhanced-card" style="border-left: 4px solid #00bbf9;">
+                        <strong style="color: #00bbf9; font-size: 1.1rem;">
+                            ${training.day.charAt(0).toUpperCase() + training.day.slice(1)}
+                        </strong>
+                        <p style="margin: 10px 0; color: rgba(255,255,255,0.8);">Дата: ${training.date}</p>
+                        <div style="color: rgba(255,255,255,0.5); font-size: 0.9rem; margin-top: 10px;">
+                            ${training.isToday ? 
+                                '<span style="color: #ffd60a; font-weight: bold;"><i class="fas fa-star"></i> Сьогодні</span>' : 
+                                '<span><i class="fas fa-clock"></i> ' + training.time + '</span>'
+                            }
+                        </div>
                     </div>
-                </div>
-            `).join('');
+                `).join('');
+            } catch (error) {
+                console.error('Помилка завантаження тренувань:', error);
+            }
         }
 
         // Отправка сообщения админу
@@ -529,10 +591,10 @@
             
             const fullMessage = `[${type.toUpperCase()}] ${message}`;
             
-            sendToAdmin(fullMessage, currentUser.teamId);
+            await sendToAdmin(fullMessage, currentUser.teamId);
             
             // Также сохраняем в локальные уведомления команды
-            TeamManager.addTeamNotification(
+            await TeamManager.addTeamNotification(
                 currentUser.teamId,
                 {
                     title: 'Звернення до адміна відправлено',
@@ -543,8 +605,8 @@
             
             document.getElementById('adminMessage').value = '';
             alert('Повідомлення адміністратору відправлено!');
-            loadMyMessages();
-            loadTeamData();
+            await loadMyMessages();
+            await loadTeamData();
         }
 
         // Показать форму добавления участника
@@ -587,23 +649,23 @@
             ]);
             
             if (result) {
-                TeamManager.addMember(currentUser.teamId, {
+                await TeamManager.addMember(currentUser.teamId, {
                     name: result.name,
                     callSign: result.callSign,
                     rank: result.rank,
                     role: result.role
                 });
                 
-                loadTeamData();
+                await loadTeamData();
                 alert('Члена команди успішно додано!');
             }
         }
 
-        function removeMember(memberId) {
+        async function removeMember(memberId) {
             if (!canEdit || !confirm('Видалити цього члена команди?')) return;
             
-            TeamManager.removeMember(currentUser.teamId, memberId);
-            loadTeamData();
+            await TeamManager.removeMember(currentUser.teamId, memberId);
+            await loadTeamData();
         }
 
         // Показать форму добавления уведомления
@@ -629,27 +691,29 @@
             ]);
             
             if (result) {
-                TeamManager.addTeamNotification(
+                const author = currentUser.isCommander ? 'Командир' : 
+                              currentUser.isDeputy ? 'Заступник' : 'Адміністратор';
+                              
+                await TeamManager.addTeamNotification(
                     currentUser.teamId, 
                     { 
                         title: result.title, 
                         message: result.message 
                     },
-                    currentUser.isCommander ? 'Командир' : 
-                    currentUser.isDeputy ? 'Заступник' : 'Адміністратор'
+                    author
                 );
                 
-                loadTeamData();
+                await loadTeamData();
                 alert('Сповіщення успішно додано!');
             }
         }
 
-        function deleteNotification(notificationId) {
+        async function deleteNotification(notificationId) {
             if (!canEdit || !confirm('Видалити це сповіщення?')) return;
             
             currentTeam.notifications = currentTeam.notifications.filter(n => n.id !== notificationId);
-            TeamManager.saveTeam(currentUser.teamId, currentTeam);
-            loadTeamData();
+            await TeamManager.saveTeam(currentUser.teamId, currentTeam);
+            await loadTeamData();
         }
 
         // Показать форму добавления задачи
@@ -675,33 +739,33 @@
             ]);
             
             if (result) {
-                TeamManager.addTask(currentUser.teamId, {
+                await TeamManager.addTask(currentUser.teamId, {
                     title: result.title,
                     description: result.description
                 });
                 
-                loadTeamData();
+                await loadTeamData();
                 alert('Завдання успішно додано!');
             }
         }
 
-        function toggleTask(taskId) {
+        async function toggleTask(taskId) {
             if (!canEdit) return;
             
             const task = currentTeam.tasks.find(t => t.id === taskId);
             if (task) {
                 task.completed = !task.completed;
-                TeamManager.saveTeam(currentUser.teamId, currentTeam);
-                loadTasks();
+                await TeamManager.saveTeam(currentUser.teamId, currentTeam);
+                await loadTasks();
             }
         }
 
-        function deleteTask(taskId) {
+        async function deleteTask(taskId) {
             if (!canEdit || !confirm('Видалити це завдання?')) return;
             
             currentTeam.tasks = currentTeam.tasks.filter(t => t.id !== taskId);
-            TeamManager.saveTeam(currentUser.teamId, currentTeam);
-            loadTasks();
+            await TeamManager.saveTeam(currentUser.teamId, currentTeam);
+            await loadTasks();
         }
 
         async function reportAbsence() {
@@ -742,21 +806,21 @@
                 }
             }
             
-            TeamManager.addAbsence(currentUser.teamId, {
+            await TeamManager.addAbsence(currentUser.teamId, {
                 memberName: name,
                 date: date,
                 reason: reason
             });
             
             // Отправляем уведомление админу
-            sendToAdmin(
+            await sendToAdmin(
                 `ВІДСУТНІСТЬ: ${name} не буде на заняттях ${date}. Причина: ${reason}. Команда: ${currentUser.teamId}`,
                 currentUser.teamId
             );
             
             // Отправляем уведомление командиру (если пользователь не командир)
             if (!currentUser.isCommander && !currentUser.isDeputy) {
-                TeamManager.addTeamNotification(
+                await TeamManager.addTeamNotification(
                     currentUser.teamId,
                     {
                         title: 'Повідомлення про відсутність',
@@ -769,10 +833,10 @@
             document.getElementById('absenceName').value = '';
             document.getElementById('absenceDate').value = '';
             
-            loadTeamData();
-            loadMyMessages();
+            await loadTeamData();
+            await loadMyMessages();
             
-            Modal.show(
+            await Modal.show(
                 'Успішно!',
                 `<p>Повідомлення відправлено!</p>
                  <p>Воно буде автоматично видалено ${date} о 23:59.</p>`,
@@ -780,12 +844,12 @@
             );
         }
 
-        function deleteAbsence(absenceId) {
+        async function deleteAbsence(absenceId) {
             if (!canEdit || !confirm('Видалити запис про відсутність?')) return;
             
             currentTeam.absences = currentTeam.absences.filter(a => a.id !== absenceId);
-            TeamManager.saveTeam(currentUser.teamId, currentTeam);
-            loadAbsences();
+            await TeamManager.saveTeam(currentUser.teamId, currentTeam);
+            await loadAbsences();
         }
 
         function showTab(tabName) {
