@@ -1,41 +1,37 @@
 // telegram-horting-storage.js
 class TelegramHortingStorage {
     constructor() {
+        // ⚠️ ЗАМЕНИТЕ ЭТИ ДАННЫЕ!
         this.botToken = '7672651709:AAGmYUj6Z8ifamx69EfKbbOJ8dCjNYPIO9s'; // Получите у @BotFather
         this.chatId = '1044367167'; // Ваш ID чата с ботом
-        this.storagePrefix = 'HORTING_'; // Префикс для ключей
+        
+        this.storagePrefix = 'HORTING_';
         this.isConnected = false;
         this.useLocalStorage = true;
-        this.messageHistory = [];
-        this.maxMessageLength = 4000; // Лимит Telegram
+        this.messageHistory = {};
     }
 
     // ==================== ИНИЦИАЛИЗАЦИЯ ====================
     
     async init() {
-        console.log("🚀 Ініціалізація Horting Telegram Storage...");
+        console.log("🚀 Ініціалізація системи Horting...");
         
-        // Проверяем наличие токена
         if (!this.botToken || this.botToken === '7672651709:AAGmYUj6Z8ifamx69EfKbbOJ8dCjNYPIO9s') {
             console.warn("⚠️ Токен бота не налаштовано");
             return this.enableLocalStorage();
         }
         
-        // Проверяем подключение к Telegram API
         const connected = await this.testConnection();
         
         if (connected) {
-            console.log("✅ Telegram Storage підключено");
+            console.log("✅ Telegram підключено");
             this.isConnected = true;
             
-            // Загружаем историю сообщений
+            // Только загружаем историю, НЕ создаем данные
             await this.loadMessageHistory();
             
-            // Инициализируем данные если нужно
-            await this.initializeDefaultData();
-            
         } else {
-            console.warn("⚠️ Telegram недоступен — використовуємо localStorage");
+            console.warn("⚠️ Telegram недоступен — localStorage");
             this.enableLocalStorage();
         }
         
@@ -50,12 +46,11 @@ class TelegramHortingStorage {
             const data = await response.json();
             return data.ok === true;
         } catch (error) {
-            console.warn("Помилка підключення до Telegram:", error);
             return false;
         }
     }
 
-    // ==================== СОХРАНЕНИЕ КОМАНД ====================
+    // ==================== КОМАНДЫ ====================
     
     async saveTeam(teamId, teamData) {
         const key = `TEAM_${teamId}`;
@@ -63,22 +58,14 @@ class TelegramHortingStorage {
             id: teamId,
             ...teamData,
             lastUpdated: new Date().toISOString(),
-            _version: (teamData._version || 0) + 1
+            version: (teamData.version || 0) + 1
         };
         
-        // Сохраняем локально для скорости
         this.saveToLocalStorage(key, dataToSave);
         
-        // Сохраняем в Telegram для синхронизации
         if (this.isConnected) {
             await this.saveToTelegram(key, dataToSave);
         }
-        
-        // Отправляем уведомление об изменении
-        await this.sendNotification(
-            `🔄 Оновлено команду: ${teamData.name || `Команда ${teamId}`}`,
-            'team'
-        );
         
         return true;
     }
@@ -86,30 +73,30 @@ class TelegramHortingStorage {
     async getTeam(teamId) {
         const key = `TEAM_${teamId}`;
         
-        // 1. Пробуем получить из кеша (память)
+        // 1. Из кеша
         if (this.messageHistory[key]) {
-            return this.messageHistory[key];
+            return this.messageHistory[key].data;
         }
         
-        // 2. Пробуем получить из Telegram
+        // 2. Из Telegram
         if (this.isConnected) {
             const telegramData = await this.loadFromTelegram(key);
             if (telegramData) {
                 this.saveToLocalStorage(key, telegramData);
-                this.messageHistory[key] = telegramData;
+                this.messageHistory[key] = { data: telegramData };
                 return telegramData;
             }
         }
         
-        // 3. Пробуем получить из localStorage
+        // 3. Из localStorage
         const localData = this.getFromLocalStorage(key);
         if (localData) {
-            this.messageHistory[key] = localData;
+            this.messageHistory[key] = { data: localData };
             return localData;
         }
         
-        // 4. Возвращаем дефолтную команду если ничего нет
-        return this.getDefaultTeam(teamId);
+        // 4. Пустая команда если ничего нет
+        return this.getEmptyTeam(teamId);
     }
     
     async getAllTeams() {
@@ -122,7 +109,7 @@ class TelegramHortingStorage {
         return teams;
     }
     
-    // ==================== УПРАВЛЕНИЕ ЧЛЕНАМИ КОМАНД ====================
+    // ==================== УЧАСТНИКИ КОМАНД ====================
     
     async addTeamMember(teamId, memberData) {
         const team = await this.getTeam(teamId);
@@ -131,9 +118,9 @@ class TelegramHortingStorage {
             team.members = [];
         }
         
-        // Проверяем, нет ли уже такого участника
+        // Проверяем, нет ли уже участника с таким именем
         const existingIndex = team.members.findIndex(m => 
-            m.id === memberData.id || m.name === memberData.name
+            m.name.toLowerCase() === memberData.name.toLowerCase()
         );
         
         if (existingIndex >= 0) {
@@ -146,22 +133,57 @@ class TelegramHortingStorage {
         } else {
             // Добавляем нового
             team.members.push({
-                ...memberData,
-                id: memberData.id || `member_${Date.now()}`,
+                id: `member_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+                name: memberData.name,
+                role: memberData.role || 'учасник',
+                age: memberData.age || null,
+                position: memberData.position || '',
+                skills: memberData.skills || [],
                 addedAt: new Date().toISOString(),
                 updatedAt: new Date().toISOString()
             });
         }
         
-        // Сохраняем команду
         await this.saveTeam(teamId, team);
         
-        await this.sendNotification(
-            `👤 ${memberData.name || 'Новий учасник'} доданий до команди ${team.name}`,
-            'success'
-        );
+        // Уведомление в Telegram
+        if (this.isConnected) {
+            await this.sendToTelegram(
+                `👤 Новий учасник: ${memberData.name}\nКоманда: ${team.name}\nРоль: ${memberData.role || 'учасник'}`,
+                'team'
+            );
+        }
         
         return true;
+    }
+    
+    async updateTeamMember(teamId, memberId, updates) {
+        const team = await this.getTeam(teamId);
+        
+        if (team.members) {
+            const memberIndex = team.members.findIndex(m => m.id === memberId);
+            
+            if (memberIndex >= 0) {
+                team.members[memberIndex] = {
+                    ...team.members[memberIndex],
+                    ...updates,
+                    updatedAt: new Date().toISOString()
+                };
+                
+                await this.saveTeam(teamId, team);
+                
+                if (this.isConnected) {
+                    await this.sendToTelegram(
+                        `✏️ Оновлено учасника: ${team.members[memberIndex].name}\nКоманда: ${team.name}`,
+                        'info'
+                    );
+                }
+                
+                return true;
+            }
+        }
+        
+        return false;
     }
     
     async removeTeamMember(teamId, memberId) {
@@ -176,10 +198,12 @@ class TelegramHortingStorage {
                 
                 await this.saveTeam(teamId, team);
                 
-                await this.sendNotification(
-                    `❌ ${removedMember.name || 'Учасник'} видалений з команди ${team.name}`,
-                    'warning'
-                );
+                if (this.isConnected) {
+                    await this.sendToTelegram(
+                        `❌ Видалено учасника: ${removedMember.name}\nКоманда: ${team.name}`,
+                        'warning'
+                    );
+                }
                 
                 return true;
             }
@@ -199,45 +223,51 @@ class TelegramHortingStorage {
         
         const task = {
             id: `task_${Date.now()}`,
-            ...taskData,
-            teamId: teamId,
-            createdAt: new Date().toISOString(),
+            title: taskData.title,
+            description: taskData.description || '',
+            assignedTo: taskData.assignedTo || [],
+            priority: taskData.priority || 'medium',
             status: 'active',
-            completed: false
+            completed: false,
+            createdAt: new Date().toISOString(),
+            deadline: taskData.deadline || null,
+            teamId: teamId
         };
         
         team.tasks.push(task);
         
         await this.saveTeam(teamId, team);
         
-        // Сохраняем задачу отдельно для глобального доступа
-        await this.saveToTelegram(`TASK_${task.id}`, task);
-        
-        await this.sendNotification(
-            `📋 Нова задача: "${taskData.title}" для команди ${team.name}`,
-            'task'
-        );
+        if (this.isConnected) {
+            await this.sendToTelegram(
+                `📋 Нова задача: ${task.title}\nКоманда: ${team.name}\nТермін: ${task.deadline || 'не вказано'}`,
+                'task'
+            );
+        }
         
         return task.id;
     }
     
-    async completeTeamTask(teamId, taskId) {
+    async updateTaskStatus(teamId, taskId, completed) {
         const team = await this.getTeam(teamId);
         
         if (team.tasks) {
             const taskIndex = team.tasks.findIndex(t => t.id === taskId);
             
             if (taskIndex >= 0) {
-                team.tasks[taskIndex].completed = true;
-                team.tasks[taskIndex].completedAt = new Date().toISOString();
-                team.tasks[taskIndex].status = 'completed';
+                team.tasks[taskIndex].completed = completed;
+                team.tasks[taskIndex].status = completed ? 'completed' : 'active';
+                team.tasks[taskIndex].completedAt = completed ? new Date().toISOString() : null;
                 
                 await this.saveTeam(teamId, team);
                 
-                await this.sendNotification(
-                    `✅ Завершено задачу: "${team.tasks[taskIndex].title}" в команді ${team.name}`,
-                    'success'
-                );
+                if (this.isConnected) {
+                    const status = completed ? '✅ Завершено' : '🔄 Активна';
+                    await this.sendToTelegram(
+                        `${status}: ${team.tasks[taskIndex].title}\nКоманда: ${team.name}`,
+                        'success'
+                    );
+                }
                 
                 return true;
             }
@@ -246,7 +276,33 @@ class TelegramHortingStorage {
         return false;
     }
     
-    // ==================== ОТСУТСТВИЯ (ABSENCES) ====================
+    async deleteTask(teamId, taskId) {
+        const team = await this.getTeam(teamId);
+        
+        if (team.tasks) {
+            const taskIndex = team.tasks.findIndex(t => t.id === taskId);
+            
+            if (taskIndex >= 0) {
+                const taskTitle = team.tasks[taskIndex].title;
+                team.tasks.splice(taskIndex, 1);
+                
+                await this.saveTeam(teamId, team);
+                
+                if (this.isConnected) {
+                    await this.sendToTelegram(
+                        `🗑️ Видалено задачу: ${taskTitle}\nКоманда: ${team.name}`,
+                        'warning'
+                    );
+                }
+                
+                return true;
+            }
+        }
+        
+        return false;
+    }
+    
+    // ==================== ОТСУТСТВИЯ ====================
     
     async addAbsence(teamId, absenceData) {
         const team = await this.getTeam(teamId);
@@ -257,102 +313,150 @@ class TelegramHortingStorage {
         
         const absence = {
             id: `absence_${Date.now()}`,
-            ...absenceData,
-            teamId: teamId,
+            memberId: absenceData.memberId,
+            memberName: absenceData.memberName,
+            reason: absenceData.reason || '',
+            startDate: absenceData.startDate,
+            endDate: absenceData.endDate || null,
+            status: 'active',
             reportedAt: new Date().toISOString(),
-            status: 'active'
+            teamId: teamId
         };
         
         team.absences.push(absence);
         
         await this.saveTeam(teamId, team);
         
-        await this.sendNotification(
-            `🏥 Відсутність: ${absenceData.memberName || 'Учасник'} в команді ${team.name} з ${absenceData.startDate} по ${absenceData.endDate || 'не визначено'}`,
-            'warning'
-        );
+        if (this.isConnected) {
+            await this.sendToTelegram(
+                `🏥 Відсутність: ${absenceData.memberName}\nКоманда: ${team.name}\nПричина: ${absenceData.reason || 'не вказана'}`,
+                'absence'
+            );
+        }
         
         return absence.id;
     }
     
-    // ==================== ГЛОБАЛЬНЫЕ УВЕДОМЛЕНИЯ ====================
-    
-    async addGlobalNotification(notificationData) {
-        const key = `GLOBAL_NOTIFICATION_${Date.now()}`;
+    async resolveAbsence(teamId, absenceId) {
+        const team = await this.getTeam(teamId);
         
-        const notification = {
-            id: key,
-            ...notificationData,
-            createdAt: new Date().toISOString(),
-            readBy: []
-        };
-        
-        // Сохраняем локально
-        const notifications = this.getFromLocalStorage('GLOBAL_NOTIFICATIONS') || [];
-        notifications.push(notification);
-        this.saveToLocalStorage('GLOBAL_NOTIFICATIONS', notifications);
-        
-        // Сохраняем в Telegram
-        if (this.isConnected) {
-            await this.saveToTelegram(key, notification);
+        if (team.absences) {
+            const absenceIndex = team.absences.findIndex(a => a.id === absenceId);
+            
+            if (absenceIndex >= 0) {
+                team.absences[absenceIndex].status = 'resolved';
+                team.absences[absenceIndex].resolvedAt = new Date().toISOString();
+                
+                await this.saveTeam(teamId, team);
+                
+                if (this.isConnected) {
+                    await this.sendToTelegram(
+                        `👍 Відсутність завершена: ${team.absences[absenceIndex].memberName}\nКоманда: ${team.name}`,
+                        'success'
+                    );
+                }
+                
+                return true;
+            }
         }
         
-        // Отправляем уведомление всем админам
-        await this.sendNotification(
-            `📢 ${notificationData.author || 'Адміністратор'}: ${notificationData.title || 'Нове сповіщення'}`,
-            'info'
-        );
+        return false;
+    }
+    
+    // ==================== УВЕДОМЛЕНИЯ ====================
+    
+    async addGlobalNotification(notificationData) {
+        const notifications = this.getFromLocalStorage('NOTIFICATIONS') || [];
+        
+        const notification = {
+            id: `notif_${Date.now()}`,
+            title: notificationData.title,
+            message: notificationData.message,
+            author: notificationData.author || 'Адміністратор',
+            targetTeams: notificationData.targetTeams || 'all',
+            createdAt: new Date().toISOString(),
+            isRead: false
+        };
+        
+        notifications.unshift(notification);
+        this.saveToLocalStorage('NOTIFICATIONS', notifications);
+        
+        if (this.isConnected) {
+            await this.saveToTelegram(`NOTIFICATION_${notification.id}`, notification);
+            
+            await this.sendToTelegram(
+                `📢 ${notification.title}\nАвтор: ${notification.author}\n${notification.message.substring(0, 100)}...`,
+                'notification'
+            );
+        }
         
         return notification.id;
     }
     
     async getGlobalNotifications() {
-        const key = 'GLOBAL_NOTIFICATIONS';
+        const notifications = this.getFromLocalStorage('NOTIFICATIONS') || [];
         
-        // Пробуем Telegram
-        if (this.isConnected) {
-            // Загружаем последние 20 уведомлений
-            const updates = await this.loadAllFromTelegram('GLOBAL_NOTIFICATION_');
-            if (updates.length > 0) {
-                this.saveToLocalStorage(key, updates);
-                return updates;
+        if (this.isConnected && notifications.length === 0) {
+            const telegramNotifs = await this.loadAllFromTelegram('NOTIFICATION_');
+            if (telegramNotifs.length > 0) {
+                const notifData = telegramNotifs.map(item => item.data);
+                this.saveToLocalStorage('NOTIFICATIONS', notifData);
+                return notifData;
             }
         }
         
-        // Используем localStorage
-        return this.getFromLocalStorage(key) || [];
+        return notifications;
     }
     
-    // ==================== СООБЩЕНИЯ АДМИНИСТРАТОРАМ ====================
-    
-    async addAdminMessage(messageData, fromTeamId) {
-        const key = `ADMIN_MESSAGE_${Date.now()}`;
+    async markNotificationAsRead(notificationId) {
+        const notifications = this.getFromLocalStorage('NOTIFICATIONS') || [];
+        const notifIndex = notifications.findIndex(n => n.id === notificationId);
         
-        const team = await this.getTeam(fromTeamId);
+        if (notifIndex >= 0) {
+            notifications[notifIndex].isRead = true;
+            notifications[notifIndex].readAt = new Date().toISOString();
+            this.saveToLocalStorage('NOTIFICATIONS', notifications);
+            return true;
+        }
+        
+        return false;
+    }
+    
+    async deleteNotification(notificationId) {
+        const notifications = this.getFromLocalStorage('NOTIFICATIONS') || [];
+        const filtered = notifications.filter(n => n.id !== notificationId);
+        this.saveToLocalStorage('NOTIFICATIONS', filtered);
+        
+        if (this.isConnected && !notificationId.startsWith('notif_')) {
+            await this.deleteFromTelegram(`NOTIFICATION_${notificationId}`);
+        }
+        
+        return true;
+    }
+    
+    // ==================== СООБЩЕНИЯ АДМИНАМ ====================
+    
+    async addAdminMessage(messageData) {
+        const messages = this.getFromLocalStorage('ADMIN_MESSAGES') || [];
         
         const message = {
-            id: key,
-            ...messageData,
-            fromTeamId: fromTeamId,
-            fromTeamName: team.name,
-            createdAt: new Date().toISOString(),
+            id: `msg_${Date.now()}`,
+            message: messageData.message,
+            fromTeam: messageData.fromTeam,
+            fromTeamId: messageData.fromTeamId,
             isRead: false,
-            readAt: null
+            createdAt: new Date().toISOString()
         };
         
-        // Сохраняем локально
-        const messages = this.getFromLocalStorage('ADMIN_MESSAGES') || [];
-        messages.push(message);
+        messages.unshift(message);
         this.saveToLocalStorage('ADMIN_MESSAGES', messages);
         
-        // Сохраняем в Telegram
         if (this.isConnected) {
-            await this.saveToTelegram(key, message);
+            await this.saveToTelegram(`ADMIN_MSG_${message.id}`, message);
             
-            // Отправляем уведомление админам
-            await this.sendNotification(
-                `📩 НОВЕ ПОВІДОМЛЕННЯ\nВід: ${team.name}\nТекст: ${messageData.message.substring(0, 100)}...`,
-                'info'
+            await this.sendToTelegram(
+                `📩 Повідомлення адміністратору\nВід: ${messageData.fromTeam}\nТекст: ${messageData.message.substring(0, 100)}...`,
+                'message'
             );
         }
         
@@ -369,31 +473,37 @@ class TelegramHortingStorage {
         return messages;
     }
     
-    async markMessageAsRead(messageId) {
+    async markAdminMessageAsRead(messageId) {
         const messages = this.getFromLocalStorage('ADMIN_MESSAGES') || [];
-        const messageIndex = messages.findIndex(m => m.id === messageId);
+        const msgIndex = messages.findIndex(m => m.id === messageId);
         
-        if (messageIndex >= 0) {
-            messages[messageIndex].isRead = true;
-            messages[messageIndex].readAt = new Date().toISOString();
+        if (msgIndex >= 0) {
+            messages[msgIndex].isRead = true;
+            messages[msgIndex].readAt = new Date().toISOString();
             this.saveToLocalStorage('ADMIN_MESSAGES', messages);
-            
-            // Обновляем в Telegram если есть
-            if (this.isConnected && !messageId.startsWith('ADMIN_MESSAGE_')) {
-                await this.saveToTelegram(messageId, messages[messageIndex]);
-            }
-            
             return true;
         }
         
         return false;
     }
     
-    // ==================== TELEGRAM API МЕТОДЫ ====================
+    async deleteAdminMessage(messageId) {
+        const messages = this.getFromLocalStorage('ADMIN_MESSAGES') || [];
+        const filtered = messages.filter(m => m.id !== messageId);
+        this.saveToLocalStorage('ADMIN_MESSAGES', filtered);
+        
+        if (this.isConnected && !messageId.startsWith('msg_')) {
+            await this.deleteFromTelegram(`ADMIN_MSG_${messageId}`);
+        }
+        
+        return true;
+    }
+    
+    // ==================== TELEGRAM API ====================
     
     async saveToTelegram(key, data) {
         try {
-            const messageText = this.createDataMessage(key, data);
+            const message = this.formatDataMessage(key, data);
             
             const response = await fetch(
                 `https://api.telegram.org/bot${this.botToken}/sendMessage`,
@@ -402,7 +512,7 @@ class TelegramHortingStorage {
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         chat_id: this.chatId,
-                        text: messageText,
+                        text: message,
                         parse_mode: 'HTML',
                         disable_web_page_preview: true
                     })
@@ -421,35 +531,32 @@ class TelegramHortingStorage {
             
             return false;
         } catch (error) {
-            console.warn("Помилка збереження в Telegram:", error);
             return false;
         }
     }
     
     async loadFromTelegram(key) {
         try {
-            // Получаем последние 100 сообщений
             const response = await fetch(
-                `https://api.telegram.org/bot${this.botToken}/getUpdates?limit=100`
+                `https://api.telegram.org/bot${this.botToken}/getUpdates?limit=50`
             );
             
             const result = await response.json();
             
             if (result.ok && result.result) {
-                // Ищем последнее сообщение с нашим ключом
                 const messages = result.result
                     .map(update => update.message)
                     .filter(msg => msg && msg.text)
                     .reverse();
                 
                 for (const msg of messages) {
-                    if (msg.text.includes(`🔐 KEY: ${key}`)) {
-                        const dataMatch = msg.text.match(/📊 DATA: (.+)/s);
+                    if (msg.text.includes(`🔑 ${key}`)) {
+                        const dataMatch = msg.text.match(/📄 Дані:\s*({[\s\S]*?})\s*🔒/);
                         if (dataMatch) {
                             try {
                                 return JSON.parse(dataMatch[1]);
                             } catch (e) {
-                                console.warn("Помилка парсингу даних:", e);
+                                return null;
                             }
                         }
                     }
@@ -458,7 +565,6 @@ class TelegramHortingStorage {
             
             return null;
         } catch (error) {
-            console.warn("Помилка завантаження з Telegram:", error);
             return null;
         }
     }
@@ -478,21 +584,20 @@ class TelegramHortingStorage {
                     .filter(msg => msg && msg.text);
                 
                 for (const msg of messages) {
-                    if (msg.text.includes('🔐 KEY: ') && 
-                        (prefix === '' || msg.text.includes(`KEY: ${prefix}`))) {
+                    if (msg.text.includes('🔑 ') && 
+                        (prefix === '' || msg.text.includes(`🔑 ${prefix}`))) {
                         
-                        const keyMatch = msg.text.match(/🔐 KEY: ([^\n]+)/);
-                        const dataMatch = msg.text.match(/📊 DATA: (.+)/s);
+                        const keyMatch = msg.text.match(/🔑 ([^\n]+)/);
+                        const dataMatch = msg.text.match(/📄 Дані:\s*({[\s\S]*?})\s*🔒/);
                         
                         if (keyMatch && dataMatch) {
                             try {
                                 allData.push({
                                     key: keyMatch[1],
-                                    data: JSON.parse(dataMatch[1]),
-                                    timestamp: new Date(msg.date * 1000).toISOString()
+                                    data: JSON.parse(dataMatch[1])
                                 });
                             } catch (e) {
-                                console.warn("Помилка парсингу:", e);
+                                // Пропускаем ошибки парсинга
                             }
                         }
                     }
@@ -501,31 +606,41 @@ class TelegramHortingStorage {
             
             return allData;
         } catch (error) {
-            console.warn("Помилка завантаження:", error);
             return [];
         }
     }
     
-    // ==================== ВСПОМОГАТЕЛЬНЫЕ МЕТОДЫ ====================
-    
-    createDataMessage(key, data) {
-        const timestamp = new Date().toLocaleString('uk-UA');
-        const dataStr = JSON.stringify(data, null, 2);
+    async deleteFromTelegram(key) {
+        const item = this.messageHistory[key];
+        if (item && item.messageId) {
+            try {
+                await fetch(
+                    `https://api.telegram.org/bot${this.botToken}/deleteMessage`,
+                    {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            chat_id: this.chatId,
+                            message_id: item.messageId
+                        })
+                    }
+                );
+                
+                delete this.messageHistory[key];
+                return true;
+            } catch (error) {
+                return false;
+            }
+        }
         
-        return `💾 <b>HORTING DATA STORAGE</b>
-🔐 <b>KEY:</b> ${key}
-⏰ <b>TIME:</b> ${timestamp}
-📊 <b>DATA:</b>
-<pre>${dataStr}</pre>
-🔒 <b>END OF DATA</b>`;
+        return false;
     }
     
-    async sendNotification(text, type = 'info') {
+    async sendToTelegram(text, type = 'info') {
         const emojis = {
             'info': 'ℹ️',
             'success': '✅',
             'warning': '⚠️',
-            'error': '❌',
             'team': '👥',
             'task': '📋',
             'absence': '🏥',
@@ -534,93 +649,95 @@ class TelegramHortingStorage {
         };
         
         const emoji = emojis[type] || '📌';
-        const message = `${emoji} <b>HORTING:</b> ${text}\n⏰ ${new Date().toLocaleString('uk-UA')}`;
+        const message = `${emoji} ${text}\n⏰ ${new Date().toLocaleString('uk-UA')}`;
         
-        if (this.isConnected) {
-            try {
-                await fetch(
-                    `https://api.telegram.org/bot${this.botToken}/sendMessage`,
-                    {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            chat_id: this.chatId,
-                            text: message,
-                            parse_mode: 'HTML'
-                        })
-                    }
-                );
-            } catch (error) {
-                console.warn("Помилка відправки сповіщення:", error);
-            }
+        try {
+            await fetch(
+                `https://api.telegram.org/bot${this.botToken}/sendMessage`,
+                {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        chat_id: this.chatId,
+                        text: message
+                    })
+                }
+            );
+        } catch (error) {
+            // Игнорируем ошибки отправки уведомлений
         }
+    }
+    
+    formatDataMessage(key, data) {
+        const timestamp = new Date().toLocaleString('uk-UA');
+        const dataStr = JSON.stringify(data, null, 2);
         
-        console.log("Notification:", text);
-        return true;
+        return `💾 <b>HORTING DATA</b>
+🔑 ${key}
+⏰ ${timestamp}
+📄 Дані:
+<pre>${dataStr}</pre>
+🔒 Кінець даних`;
     }
     
     async loadMessageHistory() {
         try {
             const response = await fetch(
-                `https://api.telegram.org/bot${this.botToken}/getUpdates?limit=50`
+                `https://api.telegram.org/bot${this.botToken}/getUpdates?limit=30`
             );
             
             const result = await response.json();
             
             if (result.ok && result.result) {
                 result.result.forEach(update => {
-                    if (update.message && update.message.text) {
-                        const text = update.message.text;
-                        if (text.includes('🔐 KEY: ')) {
-                            const keyMatch = text.match(/🔐 KEY: ([^\n]+)/);
-                            if (keyMatch) {
-                                this.messageHistory[keyMatch[1]] = {
-                                    messageId: update.message.message_id,
-                                    date: new Date(update.message.date * 1000)
-                                };
-                            }
+                    if (update.message && update.message.text && update.message.text.includes('🔑 ')) {
+                        const keyMatch = update.message.text.match(/🔑 ([^\n]+)/);
+                        if (keyMatch) {
+                            this.messageHistory[keyMatch[1]] = {
+                                messageId: update.message.message_id
+                            };
                         }
                     }
                 });
             }
         } catch (error) {
-            console.warn("Помилка завантаження історії:", error);
+            // Игнорируем ошибки загрузки истории
         }
     }
     
-    // ==================== LOCAL STORAGE МЕТОДЫ ====================
+    // ==================== LOCAL STORAGE ====================
     
     enableLocalStorage() {
         this.useLocalStorage = true;
         this.isConnected = false;
         this.initLocalStorage();
-        console.log("📦 Використовується локальне сховище");
         return false;
     }
     
     initLocalStorage() {
-        if (localStorage.getItem('horting_telegram_initialized')) return;
-        
-        console.log("🛠 Ініціалізація локального сховища...");
-        
-        // Создаем базовые команды
-        for (let i = 1; i <= 6; i++) {
-            this.saveToLocalStorage(`TEAM_${i}`, this.getDefaultTeam(i));
+        // Создаем только если совсем пусто
+        if (localStorage.getItem('horting_initialized') !== 'v2') {
+            console.log("🆕 Ініціалізація чистої бази даних...");
+            
+            // Пустые команды
+            for (let i = 1; i <= 6; i++) {
+                this.saveToLocalStorage(`TEAM_${i}`, this.getEmptyTeam(i));
+            }
+            
+            // Пустые коллекции
+            this.saveToLocalStorage('NOTIFICATIONS', []);
+            this.saveToLocalStorage('ADMIN_MESSAGES', []);
+            
+            localStorage.setItem('horting_initialized', 'v2');
+            console.log("✅ База даних готова (порожня)");
         }
-        
-        // Инициализируем другие коллекции
-        this.saveToLocalStorage('GLOBAL_NOTIFICATIONS', []);
-        this.saveToLocalStorage('ADMIN_MESSAGES', []);
-        
-        localStorage.setItem('horting_telegram_initialized', 'true');
-        console.log("✅ Локальне сховище готове");
     }
     
     saveToLocalStorage(key, value) {
         try {
             localStorage.setItem(this.storagePrefix + key, JSON.stringify(value));
         } catch (error) {
-            console.warn("Помилка збереження в localStorage:", error);
+            console.error("Помилка збереження:", error);
         }
     }
     
@@ -629,86 +746,58 @@ class TelegramHortingStorage {
             const item = localStorage.getItem(this.storagePrefix + key);
             return item ? JSON.parse(item) : null;
         } catch (error) {
-            console.warn("Помилка читання з localStorage:", error);
             return null;
         }
     }
     
-    removeFromLocalStorage(key) {
-        localStorage.removeItem(this.storagePrefix + key);
-    }
+    // ==================== ПУСТЫЕ ШАБЛОНЫ ====================
     
-    // ==================== ДЕФОЛТНЫЕ ДАННЫЕ ====================
-    
-    getDefaultTeam(id) {
-        const teams = {
-            1: { id: 1, name: "1-ша команда (молодша)", color: "#FF6B6B", type: "mal", members: [], tasks: [], absences: [], notifications: [] },
-            2: { id: 2, name: "2-га команда (молодша)", color: "#4ECDC4", type: "mal", members: [], tasks: [], absences: [], notifications: [] },
-            3: { id: 3, name: "3-тя команда (розвідка)", color: "#45B7D1", type: "mal", members: [], tasks: [], absences: [], notifications: [] },
-            4: { id: 4, name: "4-та команда (старша)", color: "#96CEB4", type: "str", members: [], tasks: [], absences: [], notifications: [] },
-            5: { id: 5, name: "5-та команда (старша)", color: "#FFEAA7", type: "str", members: [], tasks: [], absences: [], notifications: [] },
-            6: { id: 6, name: "6-та команда (старша)", color: "#DDA0DD", type: "str", members: [], tasks: [], absences: [], notifications: [] }
-        };
+    getEmptyTeam(id) {
+        const colors = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7', '#DDA0DD'];
+        const names = [
+            "1-ша команда",
+            "2-га команда", 
+            "3-тя команда",
+            "4-та команда",
+            "5-та команда",
+            "6-та команда"
+        ];
         
-        return teams[id] || {
+        return {
             id: id,
-            name: `Команда ${id}`,
-            color: "#CCCCCC",
-            type: "unknown",
+            name: names[id - 1] || `Команда ${id}`,
+            color: colors[id - 1] || '#CCCCCC',
+            type: id <= 3 ? 'mal' : 'str',
             members: [],
             tasks: [],
             absences: [],
-            notifications: []
+            notifications: [],
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            version: 1
         };
-    }
-    
-    async initializeDefaultData() {
-        // Проверяем, есть ли данные о командах
-        let needsInitialization = false;
-        
-        for (let i = 1; i <= 6; i++) {
-            const team = await this.getTeam(i);
-            if (!team.name || team.name === `Команда ${i}`) {
-                needsInitialization = true;
-                break;
-            }
-        }
-        
-        if (needsInitialization && this.isConnected) {
-            console.log("🛠 Створюємо стартові дані в Telegram...");
-            
-            for (let i = 1; i <= 6; i++) {
-                const defaultTeam = this.getDefaultTeam(i);
-                await this.saveTeam(i, defaultTeam);
-            }
-            
-            await this.sendNotification("🚀 Систему ініціалізовано з базовими даними", 'success');
-        }
     }
     
     // ==================== ЭКСПОРТ/ИМПОРТ ====================
     
-    async exportAllData() {
-        const allData = {
-            timestamp: new Date().toISOString(),
-            version: '1.0',
+    async exportData() {
+        const data = {
+            exportDate: new Date().toISOString(),
+            version: '2.0',
             teams: {},
-            notifications: this.getFromLocalStorage('GLOBAL_NOTIFICATIONS') || [],
-            messages: this.getFromLocalStorage('ADMIN_MESSAGES') || []
+            notifications: this.getFromLocalStorage('NOTIFICATIONS') || [],
+            adminMessages: this.getFromLocalStorage('ADMIN_MESSAGES') || []
         };
         
-        // Собираем данные команд
         for (let i = 1; i <= 6; i++) {
-            allData.teams[i] = await this.getTeam(i);
+            data.teams[i] = await this.getTeam(i);
         }
         
-        return allData;
+        return data;
     }
     
     async importData(data) {
-        if (!data || !data.teams) {
-            throw new Error("Невірний формат даних для імпорту");
-        }
+        if (!data || !data.teams) return false;
         
         console.log("🔄 Імпорт даних...");
         
@@ -717,54 +806,50 @@ class TelegramHortingStorage {
             await this.saveTeam(parseInt(teamId), teamData);
         }
         
-        // Импортируем уведомления
+        // Импортируем остальное
         if (data.notifications) {
-            this.saveToLocalStorage('GLOBAL_NOTIFICATIONS', data.notifications);
+            this.saveToLocalStorage('NOTIFICATIONS', data.notifications);
         }
         
-        // Импортируем сообщения
-        if (data.messages) {
-            this.saveToLocalStorage('ADMIN_MESSAGES', data.messages);
+        if (data.adminMessages) {
+            this.saveToLocalStorage('ADMIN_MESSAGES', data.adminMessages);
         }
         
-        await this.sendNotification("🔄 Імпорт даних успішно завершено", 'success');
-        
+        console.log("✅ Імпорт завершено");
         return true;
     }
     
     // ==================== СИНХРОНИЗАЦИЯ ====================
     
-    async syncAllData() {
-        if (!this.isConnected) {
-            console.warn("⚠️ Немає підключення для синхронізації");
-            return false;
-        }
+    async syncWithTelegram() {
+        if (!this.isConnected) return false;
         
-        console.log("🔄 Синхронізація даних з Telegram...");
+        console.log("🔄 Синхронізація з Telegram...");
         
         try {
-            // Загружаем все данные из Telegram
             const telegramData = await this.loadAllFromTelegram();
             
-            // Обновляем локальные данные
             telegramData.forEach(item => {
                 if (item.key.startsWith('TEAM_')) {
                     this.saveToLocalStorage(item.key, item.data);
-                } else if (item.key.startsWith('GLOBAL_NOTIFICATION_')) {
-                    const notifications = this.getFromLocalStorage('GLOBAL_NOTIFICATIONS') || [];
-                    const existingIndex = notifications.findIndex(n => n.id === item.key);
-                    if (existingIndex >= 0) {
-                        notifications[existingIndex] = item.data;
-                    } else {
+                } else if (item.key.startsWith('NOTIFICATION_')) {
+                    const notifications = this.getFromLocalStorage('NOTIFICATIONS') || [];
+                    const exists = notifications.some(n => n.id === item.data.id);
+                    if (!exists) {
                         notifications.push(item.data);
                     }
-                    this.saveToLocalStorage('GLOBAL_NOTIFICATIONS', notifications);
+                    this.saveToLocalStorage('NOTIFICATIONS', notifications);
+                } else if (item.key.startsWith('ADMIN_MSG_')) {
+                    const messages = this.getFromLocalStorage('ADMIN_MESSAGES') || [];
+                    const exists = messages.some(m => m.id === item.data.id);
+                    if (!exists) {
+                        messages.push(item.data);
+                    }
+                    this.saveToLocalStorage('ADMIN_MESSAGES', messages);
                 }
             });
             
             console.log("✅ Синхронізація завершена");
-            await this.sendNotification("🔄 Дані синхронізовано з Telegram", 'success');
-            
             return true;
         } catch (error) {
             console.error("❌ Помилка синхронізації:", error);
@@ -774,8 +859,8 @@ class TelegramHortingStorage {
     
     // ==================== ОЧИСТКА ====================
     
-    clearLocalData() {
-        // Очищаем только наши данные
+    clearAllData() {
+        // Очищаем localStorage
         const keys = Object.keys(localStorage);
         keys.forEach(key => {
             if (key.startsWith(this.storagePrefix)) {
@@ -783,13 +868,20 @@ class TelegramHortingStorage {
             }
         });
         
-        localStorage.removeItem('horting_telegram_initialized');
+        localStorage.removeItem('horting_initialized');
         this.messageHistory = {};
         
-        console.log("🧹 Локальні дані очищено");
+        console.log("🧹 Всі дані очищено");
+        return true;
+    }
+    
+    resetToDefault() {
+        this.clearAllData();
+        this.initLocalStorage();
+        console.log("🔄 Скинуто до початкового стану");
         return true;
     }
 }
 
-// Создаем глобальный инстанс
-window.HortingTelegramStorage = new TelegramHortingStorage();
+// Глобальный экземпляр
+window.HortingStorage = new TelegramHortingStorage();
