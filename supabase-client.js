@@ -22,22 +22,36 @@ class SupabaseClient {
             return this.enableLocalStorage();
         }
 
-        // 2. Проверяем наличие SDK
-        if (typeof supabase === "undefined") {
+        // 2. Проверяем наличие SDK - исправленная проверка
+        if (typeof window.supabase === "undefined" || !window.supabase.createClient) {
             console.warn("⚠️ Supabase SDK не завантажено — localStorage");
             return this.enableLocalStorage();
         }
 
         // 3. Создаём клиент
-        this.client = supabase.createClient(
-            window.SUPABASE_CONFIG.url,
-            window.SUPABASE_CONFIG.key,
-            { auth: { persistSession: false } }
-        );
+        try {
+            this.client = window.supabase.createClient(
+                window.SUPABASE_CONFIG.url,
+                window.SUPABASE_CONFIG.key,
+                { auth: { persistSession: false } }
+            );
+        } catch (e) {
+            console.warn("⚠️ Не вдалося створити клієнт:", e);
+            return this.enableLocalStorage();
+        }
 
         // 4. Проверяем соединение
         try {
-            const { error } = await this.client.from("teams").select("id").limit(1);
+            // Используем try-catch вместо .catch()
+            let data, error;
+            try {
+                const result = await this.client.from("teams").select("id").limit(1);
+                data = result.data;
+                error = result.error;
+            } catch (e) {
+                console.warn("⚠️ Помилка запиту:", e);
+                return this.enableLocalStorage();
+            }
 
             if (error) {
                 console.warn("⚠️ Supabase недоступен:", error.message);
@@ -70,19 +84,38 @@ class SupabaseClient {
     //  ИНИЦИАЛИЗАЦИЯ КОМАНД
     // =============================
     async initializeTeamsIfMissing() {
-        if (!this.isConnected) return;
+        if (!this.isConnected || !this.client) return;
 
-        const { data: teams, error } = await this.client.from("teams").select("*");
+        try {
+            const { data: teams, error } = await this.client.from("teams").select("*");
 
-        if (error) return;
+            if (error) {
+                console.warn("⚠️ Помилка при отриманні команд:", error);
+                return;
+            }
 
-        if (!teams || teams.length < 6) {
-            console.log("🛠 Створюємо початкові команди...");
+            if (!teams || teams.length < 6) {
+                console.log("🛠 Створюємо початкові команди...");
 
-            const baseTeams = this.generateDefaultTeamsArray();
+                const baseTeams = this.generateDefaultTeamsArray();
 
-            await this.client.from("teams").upsert(baseTeams);
-            console.log("✅ Команди ініціалізовано");
+                // Добавляем поля для базы данных
+                const teamsForDB = baseTeams.map(team => ({
+                    ...team,
+                    created_at: new Date().toISOString(),
+                    updated_at: new Date().toISOString()
+                }));
+
+                const { error: upsertError } = await this.client.from("teams").upsert(teamsForDB);
+                
+                if (upsertError) {
+                    console.warn("⚠️ Помилка при створенні команд:", upsertError);
+                } else {
+                    console.log("✅ Команди ініціалізовано");
+                }
+            }
+        } catch (e) {
+            console.warn("⚠️ Помилка ініціалізації команд:", e);
         }
     }
 
@@ -133,13 +166,23 @@ class SupabaseClient {
     async getTeam(id) {
         if (this.useLocalStorage) return this.getLocalData(`team_${id}`);
 
+        if (!this.isConnected || !this.client) return this.getLocalData(`team_${id}`);
+
         try {
             const { data, error } = await this.client.from("teams").select("*").eq("id", id).single();
-            if (error) return this.getLocalData(`team_${id}`);
+            
+            if (error) {
+                console.warn("⚠️ Помилка отримання команди:", error);
+                return this.getLocalData(`team_${id}`);
+            }
 
-            this.saveLocalData(`team_${id}`, data);
-            return data;
-        } catch {
+            if (data) {
+                this.saveLocalData(`team_${id}`, data);
+            }
+            
+            return data || this.getLocalData(`team_${id}`);
+        } catch (e) {
+            console.warn("⚠️ Виняток при отриманні команди:", e);
             return this.getLocalData(`team_${id}`);
         }
     }
@@ -147,12 +190,26 @@ class SupabaseClient {
     async saveTeam(id, teamData) {
         this.saveLocalData(`team_${id}`, teamData);
 
-        if (this.useLocalStorage || !this.isConnected) return true;
+        if (this.useLocalStorage || !this.isConnected || !this.client) return true;
 
-        const { error } = await this.client.from("teams").upsert(teamData);
-        if (error) console.error("Помилка збереження команди:", error);
+        try {
+            const dataForDB = {
+                ...teamData,
+                updated_at: new Date().toISOString()
+            };
 
-        return !error;
+            const { error } = await this.client.from("teams").upsert(dataForDB);
+            
+            if (error) {
+                console.error("Помилка збереження команди:", error);
+                return false;
+            }
+
+            return true;
+        } catch (e) {
+            console.error("Виняток при збереженні команди:", e);
+            return false;
+        }
     }
 
     async getTeams() {
@@ -164,16 +221,31 @@ class SupabaseClient {
             return result;
         }
 
-        const { data, error } = await this.client.from("teams").select("*").order("id");
-
-        if (error || !data) {
+        if (!this.isConnected || !this.client) {
             const result = {};
             for (let i = 1; i <= 6; i++) result[i] = this.getLocalData(`team_${i}`);
             return result;
         }
 
-        data.forEach(t => this.saveLocalData(`team_${t.id}`, t));
-        return Object.fromEntries(data.map(t => [t.id, t]));
+        try {
+            const { data, error } = await this.client.from("teams").select("*").order("id");
+
+            if (error || !data) {
+                console.warn("⚠️ Помилка отримання команд:", error);
+                const result = {};
+                for (let i = 1; i <= 6; i++) result[i] = this.getLocalData(`team_${i}`);
+                return result;
+            }
+
+            data.forEach(t => this.saveLocalData(`team_${t.id}`, t));
+            
+            return Object.fromEntries(data.map(t => [t.id, t]));
+        } catch (e) {
+            console.warn("⚠️ Виняток при отриманні команд:", e);
+            const result = {};
+            for (let i = 1; i <= 6; i++) result[i] = this.getLocalData(`team_${i}`);
+            return result;
+        }
     }
 
     // =============================
@@ -182,15 +254,28 @@ class SupabaseClient {
     async getGlobalNotifications() {
         if (this.useLocalStorage) return this.getLocalData("global_notifications") || [];
 
-        const { data, error } = await this.client
-            .from("global_notifications")
-            .select("*")
-            .order("created_at", { ascending: false });
+        if (!this.isConnected || !this.client) return this.getLocalData("global_notifications") || [];
 
-        if (error) return this.getLocalData("global_notifications") || [];
+        try {
+            const { data, error } = await this.client
+                .from("global_notifications")
+                .select("*")
+                .order("created_at", { ascending: false });
 
-        this.saveLocalData("global_notifications", data);
-        return data;
+            if (error) {
+                console.warn("⚠️ Помилка отримання сповіщень:", error);
+                return this.getLocalData("global_notifications") || [];
+            }
+
+            if (data) {
+                this.saveLocalData("global_notifications", data);
+            }
+
+            return data || this.getLocalData("global_notifications") || [];
+        } catch (e) {
+            console.warn("⚠️ Виняток при отриманні сповіщень:", e);
+            return this.getLocalData("global_notifications") || [];
+        }
     }
 
     async addGlobalNotification(info, author = "Адміністратор") {
@@ -208,9 +293,17 @@ class SupabaseClient {
         this.saveLocalData("global_notifications", cache);
 
         // Supabase
-        if (this.isConnected) {
-            const { id, ...dataForDB } = notif;
-            await this.client.from("global_notifications").insert(dataForDB);
+        if (this.isConnected && this.client) {
+            try {
+                const { id, ...dataForDB } = notif;
+                const { error } = await this.client.from("global_notifications").insert(dataForDB);
+                
+                if (error) {
+                    console.warn("⚠️ Помилка збереження сповіщення:", error);
+                }
+            } catch (e) {
+                console.warn("⚠️ Виняток при збереженні сповіщення:", e);
+            }
         }
 
         return true;
@@ -220,8 +313,12 @@ class SupabaseClient {
         const list = this.getLocalData("global_notifications") || [];
         this.saveLocalData("global_notifications", list.filter(n => n.id !== id));
 
-        if (this.isConnected && !id.startsWith("notif_")) {
-            await this.client.from("global_notifications").delete().eq("id", id);
+        if (this.isConnected && this.client && !id.startsWith("notif_")) {
+            try {
+                await this.client.from("global_notifications").delete().eq("id", id);
+            } catch (e) {
+                console.warn("⚠️ Виняток при видаленні сповіщення:", e);
+            }
         }
 
         return true;
@@ -233,15 +330,28 @@ class SupabaseClient {
     async getAdminMessages() {
         if (this.useLocalStorage) return this.getLocalData("admin_messages") || [];
 
-        const { data, error } = await this.client
-            .from("admin_messages")
-            .select("*")
-            .order("created_at", { ascending: false });
+        if (!this.isConnected || !this.client) return this.getLocalData("admin_messages") || [];
 
-        if (error) return this.getLocalData("admin_messages") || [];
+        try {
+            const { data, error } = await this.client
+                .from("admin_messages")
+                .select("*")
+                .order("created_at", { ascending: false });
 
-        this.saveLocalData("admin_messages", data);
-        return data;
+            if (error) {
+                console.warn("⚠️ Помилка отримання повідомлень:", error);
+                return this.getLocalData("admin_messages") || [];
+            }
+
+            if (data) {
+                this.saveLocalData("admin_messages", data);
+            }
+
+            return data || this.getLocalData("admin_messages") || [];
+        } catch (e) {
+            console.warn("⚠️ Виняток при отриманні повідомлень:", e);
+            return this.getLocalData("admin_messages") || [];
+        }
     }
 
     async addAdminMessage(text, fromTeam) {
@@ -260,9 +370,17 @@ class SupabaseClient {
         list.unshift(msg);
         this.saveLocalData("admin_messages", list);
 
-        if (this.isConnected) {
-            const { id, fromTeam, read, date, ...dbData } = msg;
-            await this.client.from("admin_messages").insert(dbData);
+        if (this.isConnected && this.client) {
+            try {
+                const { id, fromTeam, read, date, ...dbData } = msg;
+                const { error } = await this.client.from("admin_messages").insert(dbData);
+                
+                if (error) {
+                    console.warn("⚠️ Помилка збереження повідомлення:", error);
+                }
+            } catch (e) {
+                console.warn("⚠️ Виняток при збереженні повідомлення:", e);
+            }
         }
 
         return true;
@@ -277,8 +395,12 @@ class SupabaseClient {
             this.saveLocalData("admin_messages", list);
         }
 
-        if (this.isConnected && !id.startsWith("msg_")) {
-            await this.client.from("admin_messages").update({ is_read: true }).eq("id", id);
+        if (this.isConnected && this.client && !id.startsWith("msg_")) {
+            try {
+                await this.client.from("admin_messages").update({ is_read: true }).eq("id", id);
+            } catch (e) {
+                console.warn("⚠️ Виняток при оновленні повідомлення:", e);
+            }
         }
     }
 
@@ -287,8 +409,12 @@ class SupabaseClient {
         list.forEach(m => { m.read = true; m.is_read = true; });
         this.saveLocalData("admin_messages", list);
 
-        if (this.isConnected) {
-            await this.client.from("admin_messages").update({ is_read: true }).eq("is_read", false);
+        if (this.isConnected && this.client) {
+            try {
+                await this.client.from("admin_messages").update({ is_read: true }).eq("is_read", false);
+            } catch (e) {
+                console.warn("⚠️ Виняток при оновленні всіх повідомлень:", e);
+            }
         }
     }
 
@@ -296,8 +422,12 @@ class SupabaseClient {
         const list = this.getLocalData("admin_messages") || [];
         this.saveLocalData("admin_messages", list.filter(m => m.id !== id));
 
-        if (this.isConnected && !id.startsWith("msg_")) {
-            await this.client.from("admin_messages").delete().eq("id", id);
+        if (this.isConnected && this.client && !id.startsWith("msg_")) {
+            try {
+                await this.client.from("admin_messages").delete().eq("id", id);
+            } catch (e) {
+                console.warn("⚠️ Виняток при видаленні повідомлення:", e);
+            }
         }
     }
 
@@ -305,16 +435,36 @@ class SupabaseClient {
     // LOCAL STORAGE HELPERS
     // =============================
     saveLocalData(key, value) {
-        localStorage.setItem(key, JSON.stringify(value));
+        try {
+            localStorage.setItem(key, JSON.stringify(value));
+        } catch (e) {
+            console.error("⚠️ Помилка збереження в localStorage:", e);
+        }
     }
 
     getLocalData(key) {
         try {
-            return JSON.parse(localStorage.getItem(key));
-        } catch {
+            const item = localStorage.getItem(key);
+            return item ? JSON.parse(item) : null;
+        } catch (e) {
+            console.error("⚠️ Помилка читання з localStorage:", e);
             return null;
         }
     }
+
+    // =============================
+    // CLEAR CACHE
+    // =============================
+    clearCache() {
+        for (let i = 1; i <= 6; i++) {
+            localStorage.removeItem(`team_${i}`);
+        }
+        localStorage.removeItem("global_notifications");
+        localStorage.removeItem("admin_messages");
+        localStorage.removeItem("horting_initialized");
+        console.log("🧹 Кеш очищено");
+    }
 }
 
+// Создаем глобальный экземпляр
 window.HortingDB = new SupabaseClient();
