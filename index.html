@@ -1,19 +1,30 @@
- <!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="uk">
 <head>
-<!-- Вставьте в head вашего HTML -->
-<script src="https://unpkg.com/@supabase/supabase-js@2"></script>
-
-<script>
-// Конфигурация Supabase - подставьте свои значения
-window.SUPABASE_CONFIG = {
-    url: 'https://zgumvczkfaracjqvdjzm.supabase.co', // или ваш URL
-    key: 'sb_publishable_02yXlmq8Tdob9mCplLOcOg_amQO8c0k' // ваш anon key
-};
-</script>
-
-<!-- Затем подключайте ваш скрипт -->
-<script src="supabase-client.js"></script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Horting System</title>
+    
+    <!-- Подключаем Supabase SDK -->
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+    
+    <script>
+    // Конфигурация Supabase
+    window.SUPABASE_CONFIG = {
+        url: 'https://zgumvczkfaracjqvdjzm.supabase.co',
+        key: 'sb_secret_a0Wr0v5zADqAykLgVItbww_fkr1912m'
+    };
+    </script>
+    
+    <!-- Ваши стили -->
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <!-- Ваше приложение здесь -->
+    
+    <!-- Подключаем ваш скрипт в конце body -->
+    <script src="supabase-client.js"></script>
+</body>
 <head> 
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
