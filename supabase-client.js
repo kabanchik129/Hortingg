@@ -1,7 +1,3 @@
-// =============================
-// supabase-client.js
-// Полный, готовый, оптимизированный клиент
-// =============================
 
 class SupabaseClient {
     constructor() {
@@ -80,9 +76,6 @@ class SupabaseClient {
         return false;
     }
 
-    // =============================
-    //  ИНИЦИАЛИЗАЦИЯ КОМАНД
-    // =============================
     async initializeTeamsIfMissing() {
         if (!this.isConnected || !this.client) return;
 
@@ -139,9 +132,7 @@ class SupabaseClient {
         }));
     }
 
-    // =============================
-    // LOCAL STORAGE INIT
-    // =============================
+    
     initLocalStorage() {
         if (localStorage.getItem("horting_initialized")) return;
 
@@ -160,9 +151,7 @@ class SupabaseClient {
         console.log("✅ LocalStorage готовий");
     }
 
-    // =============================
-    // TEAM FUNCTIONS
-    // =============================
+
     async getTeam(id) {
         if (this.useLocalStorage) return this.getLocalData(`team_${id}`);
 
@@ -248,9 +237,7 @@ class SupabaseClient {
         }
     }
 
-    // =============================
-    // GLOBAL NOTIFICATIONS
-    // =============================
+
     async getGlobalNotifications() {
         if (this.useLocalStorage) return this.getLocalData("global_notifications") || [];
 
@@ -324,9 +311,7 @@ class SupabaseClient {
         return true;
     }
 
-    // =============================
-    // ADMIN MESSAGES
-    // =============================
+
     async getAdminMessages() {
         if (this.useLocalStorage) return this.getLocalData("admin_messages") || [];
 
@@ -452,9 +437,7 @@ class SupabaseClient {
         }
     }
 
-    // =============================
-    // CLEAR CACHE
-    // =============================
+
     clearCache() {
         for (let i = 1; i <= 6; i++) {
             localStorage.removeItem(`team_${i}`);
