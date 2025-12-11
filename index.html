@@ -3,413 +3,583 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Horting System</title>
-    
-    <!-- Supabase SDK -->
-    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
-    
-    <script>
-    // Конфигурация Supabase
-    window.SUPABASE_CONFIG = {
-        url: 'https://zgumvczkfaracjqvdjzm.supabase.co',
-        key: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpndW12Y3prZmFyYWNqcXZkanptIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjUyODY0NjcsImV4cCI6MjA4MDg2MjQ2N30.H8yUfSceeXgrm75ra5ORlj9on8t80Y8APzH4k3OeF1o'
-    };
-    </script>
-    
-    <!-- Стили (если есть) -->
-    <link rel="stylesheet" href="styles.css">
-</head>
-<body>
-    <!-- Приложение -->
-    
-    <!-- НЕ подключаем supabase-client.js локально -->
-</body>
-</html>
-<head> 
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Хортинг | Вхід</title>
-    <link rel="stylesheet" href="style.css">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    
+    <title>🏕 Horting System</title>
     <style>
-        /* ТОЛЬКО индикатор статуса в углу */
-        .status-indicator {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            z-index: 1000;
-            padding: 8px 16px;
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+            color: #333;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
             border-radius: 20px;
-            font-size: 12px;
-            font-weight: 500;
+            padding: 30px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        
+        header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 2px solid #f0f0f0;
+        }
+        
+        h1 {
+            color: #2d3748;
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+        
+        .status {
+            padding: 15px;
+            border-radius: 10px;
+            margin: 20px 0;
+            font-weight: bold;
+            text-align: center;
+            transition: all 0.3s;
+        }
+        
+        .status.connected {
+            background: #c6f6d5;
+            color: #22543d;
+            border: 2px solid #9ae6b4;
+        }
+        
+        .status.disconnected {
+            background: #fed7d7;
+            color: #742a2a;
+            border: 2px solid #fc8181;
+        }
+        
+        .controls {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin: 30px 0;
+        }
+        
+        button {
+            padding: 15px 25px;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
             display: flex;
             align-items: center;
-            gap: 8px;
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            background: rgba(255, 214, 10, 0.2);
-            color: #ffd60a;
+            justify-content: center;
+            gap: 10px;
         }
         
-        .status-online {
-            background: rgba(26, 147, 111, 0.2);
-            color: #1a936f;
-            border-color: rgba(26, 147, 111, 0.3);
+        button:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 7px 14px rgba(0,0,0,0.1);
         }
         
-        .status-offline {
-            background: rgba(255, 107, 107, 0.2);
-            color: #ff6b6b;
-            border-color: rgba(255, 107, 107, 0.3);
-        }
-        
-        .status-icon {
-            animation: spin 2s linear infinite;
-        }
-        
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-        
-        .login-container {
-            width: 100%;
-            max-width: 440px;
-            margin: 0 auto;
-        }
-        
-        .input-group {
-            margin-bottom: 20px;
-        }
-        
-        .form-actions {
-            margin-top: 25px;
-        }
-        
-        .quick-login {
-            margin-top: 25px;
-            padding: 20px;
-            background: rgba(157, 78, 221, 0.1);
-            border-radius: 16px;
-            border-left: 4px solid #9d4edd;
-        }
-        
-        .quick-btn {
-            flex: 1;
-            min-width: 80px;
-            padding: 10px 15px;
-            background: rgba(157, 78, 221, 0.2);
-            border: 1px solid #9d4edd;
-            border-radius: 8px;
+        .btn-primary {
+            background: #4299e1;
             color: white;
-            font-size: 13px;
-            font-weight: 500;
-            cursor: pointer;
-            transition: all 0.3s ease;
         }
         
-        .quick-btn:hover {
-            background: rgba(157, 78, 221, 0.3);
-            transform: translateY(-2px);
+        .btn-primary:hover {
+            background: #3182ce;
         }
         
-        .connection-status {
+        .btn-success {
+            background: #48bb78;
+            color: white;
+        }
+        
+        .btn-success:hover {
+            background: #38a169;
+        }
+        
+        .btn-warning {
+            background: #ed8936;
+            color: white;
+        }
+        
+        .btn-warning:hover {
+            background: #dd6b20;
+        }
+        
+        .btn-danger {
+            background: #f56565;
+            color: white;
+        }
+        
+        .btn-danger:hover {
+            background: #e53e3e;
+        }
+        
+        .data-section {
+            margin-top: 40px;
+            padding: 20px;
+            background: #f7fafc;
+            border-radius: 15px;
+            border: 2px solid #e2e8f0;
+        }
+        
+        .team-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+        
+        .team-card {
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            border-left: 5px solid;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        
+        .team-card h3 {
+            margin-bottom: 15px;
+            color: #2d3748;
+        }
+        
+        .member-list, .task-list {
+            list-style: none;
             margin-top: 10px;
-            padding: 10px;
-            border-radius: 8px;
-            background: rgba(41, 196, 255, 0.1);
-            border: 1px solid rgba(41, 196, 255, 0.2);
+        }
+        
+        .member-list li, .task-list li {
+            padding: 8px;
+            margin: 5px 0;
+            background: #f8f9fa;
+            border-radius: 6px;
+            border-left: 3px solid;
+        }
+        
+        .notification {
+            padding: 15px;
+            margin: 10px 0;
+            background: white;
+            border-radius: 10px;
+            border-left: 4px solid #4299e1;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+        
+        .notification.unread {
+            border-left-color: #f56565;
+            background: #fff5f5;
+        }
+        
+        .message {
+            padding: 15px;
+            margin: 10px 0;
+            background: #ebf8ff;
+            border-radius: 10px;
+            border: 1px solid #bee3f8;
+        }
+        
+        .message.unread {
+            background: #ebf8ff;
+            border-color: #4299e1;
+        }
+        
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+        
+        .stat-card {
+            text-align: center;
+            padding: 20px;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+        }
+        
+        .stat-number {
+            font-size: 2em;
+            font-weight: bold;
+            color: #4299e1;
+        }
+        
+        .stat-label {
+            color: #718096;
+            margin-top: 5px;
+        }
+        
+        footer {
+            margin-top: 40px;
+            text-align: center;
+            color: #718096;
+            font-size: 0.9em;
+            padding-top: 20px;
+            border-top: 1px solid #e2e8f0;
         }
     </style>
 </head>
-<body class="login-page">
-    <!-- Просто индикатор статуса -->
-    <div id="statusIndicator" class="status-indicator">
-        <i class="fas fa-sync-alt status-icon"></i>
-        <span>Завантаження...</span>
-    </div>
-    
-    <div class="gradient-bg"></div>
-    <div class="particles" id="particles"></div>
-    
+<body>
     <div class="container">
-        <div class="login-container">
-            <!-- Логотип -->
-            <div class="logo-section">
-                <div class="logo">
-                    <div class="logo-icon">
-                        <i class="fas fa-shield-alt"></i>
-                    </div>
-                    <h1>Хортинг</h1>
-                </div>
-                <p class="tagline">Військово-патріотична спільнота</p>
-                <div id="connectionStatus" class="connection-status">
-                    <small style="color: rgba(255, 255, 255, 0.7);">
-                        <i class="fas fa-sync-alt fa-spin"></i> Завантаження системи...
-                    </small>
-                </div>
-            </div>
-
-            <!-- Форма входа -->
-            <div class="form-section">
-                <div class="form-card">
-                    <h2>Вхід до системи</h2>
-                    
-                    <div class="input-group">
-                        <div class="input-wrapper">
-                            <i class="fas fa-key"></i>
-                            <input 
-                                type="password" 
-                                id="passwordInput" 
-                                placeholder="Введіть пароль доступу" 
-                                autocomplete="off"
-                                autofocus
-                            >
-                            <button class="toggle-password" id="togglePassword">
-                                <i class="fas fa-eye"></i>
-                            </button>
-                        </div>
-                        
-                        <div class="form-actions">
-                            <button class="btn-primary" id="loginBtn">
-                                <i class="fas fa-sign-in-alt"></i>
-                                <span>Увійти</span>
-                            </button>
-                        </div>
-                        
-                        <p id="errorMessage" class="error-message"></p>
-                    </div>
-
-                    <!-- Информация для админа -->
-                    <div class="admin-info">
-                        <div class="admin-card">
-                            <h3><i class="fas fa-info-circle"></i> Інформація для адміністратора</h3>
-                            <p>Пароль адміністратора: <code>kyka7</code></p>
-                            <p class="small-text">Для перевірки системи використовуйте цей пароль</p>
-                        </div>
-                    </div>
-                    
-                    <!-- Быстрый вход для тестирования -->
-                    <div class="quick-login">
-                        <h4 style="color: #9d4edd; font-size: 14px; margin-bottom: 15px; display: flex; align-items: center; gap: 8px;">
-                            <i class="fas fa-bolt"></i> Швидкий вхід (для тесту)
-                        </h4>
-                        <div style="display: flex; flex-wrap: wrap; gap: 10px;">
-                            <button class="quick-btn" onclick="quickLogin('kyka7')" style="background: rgba(157, 78, 221, 0.2); border-color: #9d4edd;">
-                                Адмін (kyka7)
-                            </button>
-                            <button class="quick-btn" onclick="quickLogin('mal1kab123_kam')" style="background: rgba(255, 107, 107, 0.2); border-color: #ff6b6b;">
-                                Ком. 1 команди
-                            </button>
-                            <button class="quick-btn" onclick="quickLogin('str4kab456_zam')" style="background: rgba(41, 196, 255, 0.2); border-color: #29c4ff;">
-                                Зам. 4 команди
-                            </button>
-                            <button class="quick-btn" onclick="quickLogin('mal2kab777')" style="background: rgba(255, 214, 10, 0.2); border-color: #ffd60a;">
-                                Боець 2 команди
-                            </button>
-                        </div>
-                        <p style="margin-top: 15px; color: rgba(255, 255, 255, 0.5); font-size: 12px;">
-                            Формат паролів: mal1kab123_kam, str4kab456_zam, mal2kab777
-                        </p>
-                    </div>
-                    
-                    <!-- Расписание занятий -->
-                    <div style="margin-top: 25px; padding: 15px; background: rgba(41, 196, 255, 0.1); border-radius: 12px; border-left: 4px solid #29c4ff;">
-                        <h4 style="color: #29c4ff; font-size: 14px; margin-bottom: 10px; display: flex; align-items: center; gap: 8px;">
-                            <i class="fas fa-calendar-alt"></i> Розклад занять
-                        </h4>
-                        <ul style="color: rgba(255, 255, 255, 0.8); font-size: 13px; margin: 0; padding-left: 20px;">
-                            <li><strong>Понеділок:</strong> 16:00 - 19:00</li>
-                            <li><strong>Середа:</strong> 16:00 - 19:00</li>
-                            <li><strong>Субота:</strong> 12:00 - 16:00</li>
-                        </ul>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Футер -->
-            <footer>
-                <p>© 2024 Хортинг. Лише для авторизованих користувачів</p>
-            </footer>
+        <header>
+            <h1>🏕 Система Управління Хортинґом</h1>
+            <p>Версія 2.0 - Telegram Storage Edition</p>
+        </header>
+        
+        <div id="status" class="status disconnected">
+            ⏳ Завантаження системи...
         </div>
+        
+        <div class="controls">
+            <button class="btn-primary" onclick="initStorage()">
+                <span>🚀</span> Ініціалізувати
+            </button>
+            <button class="btn-success" onclick="testSystem()">
+                <span>🧪</span> Тест системи
+            </button>
+            <button class="btn-warning" onclick="addTestData()">
+                <span>➕</span> Додати тестові дані
+            </button>
+            <button class="btn-primary" onclick="syncData()">
+                <span>🔄</span> Синхронізувати
+            </button>
+            <button class="btn-success" onclick="exportData()">
+                <span>💾</span> Експорт даних
+            </button>
+            <button class="btn-danger" onclick="resetData()">
+                <span>🗑️</span> Очистити все
+            </button>
+        </div>
+        
+        <div class="stats">
+            <div class="stat-card">
+                <div class="stat-number" id="teamCount">0</div>
+                <div class="stat-label">Команд</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="memberCount">0</div>
+                <div class="stat-label">Учасників</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="taskCount">0</div>
+                <div class="stat-label">Задач</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="notificationCount">0</div>
+                <div class="stat-label">Сповіщень</div>
+            </div>
+        </div>
+        
+        <div class="data-section">
+            <h2>Швидке тестування</h2>
+            <div style="margin: 20px 0;">
+                <button onclick="addTeamMember(1, 'Іван Петренко', 'скаут')">Додати учасника в 1 команду</button>
+                <button onclick="addTeamTask(1, 'Приготувати вечерю')">Додати задачу 1 команді</button>
+                <button onclick="addGlobalNotification('Важливе повідомлення', 'Адмін')">Додати сповіщення</button>
+            </div>
+        </div>
+        
+        <div class="data-section">
+            <h2>Стан системи</h2>
+            <div id="systemInfo" style="padding: 15px; background: #f0f4f8; border-radius: 8px; margin-top: 10px;">
+                Очікування ініціалізації...
+            </div>
+        </div>
+        
+        <footer>
+            <p>Система Horting &copy; 2024 | Версія: Telegram Storage</p>
+            <p>Використовує Telegram Bot API для збереження даних</p>
+        </footer>
     </div>
-
-    <!-- Supabase SDK -->
-    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
-    
-    <!-- Наши файлы -->
-    <script src="supabase-config.js"></script>
-    <script src="supabase-client.js"></script>
-    <script src="script.js"></script>
 
     <script>
-        // Создание частиц
-        function createParticles() {
-            const particlesContainer = document.getElementById('particles');
-            const particleCount = window.innerWidth < 768 ? 15 : 30;
-            
-            for (let i = 0; i < particleCount; i++) {
-                const particle = document.createElement('div');
-                particle.className = 'particle';
-                
-                const size = Math.random() * 4 + 1;
-                const posX = Math.random() * 100;
-                const posY = Math.random() * 100;
-                const duration = Math.random() * 20 + 10;
-                const delay = Math.random() * 5;
-                
-                particle.style.cssText = `
-                    width: ${size}px;
-                    height: ${size}px;
-                    left: ${posX}%;
-                    top: ${posY}%;
-                    animation-duration: ${duration}s;
-                    animation-delay: ${delay}s;
-                `;
-                
-                particlesContainer.appendChild(particle);
-            }
-        }
+        // ==================== ФУНКЦИИ УПРАВЛЕНИЯ ====================
         
-        // Показать/скрыть пароль
-        document.getElementById('togglePassword').addEventListener('click', function() {
-            const passwordInput = document.getElementById('passwordInput');
-            const icon = this.querySelector('i');
+        async function initStorage() {
+            updateStatus('🔄 Ініціалізація системи...', 'disconnected');
             
-            if (passwordInput.type === 'password') {
-                passwordInput.type = 'text';
-                icon.className = 'fas fa-eye-slash';
+            const connected = await window.HortingStorage.init();
+            
+            if (connected) {
+                updateStatus('✅ Підключено до Telegram Storage!', 'connected');
+                await updateStats();
+                await showSystemInfo();
             } else {
-                passwordInput.type = 'password';
-                icon.className = 'fas fa-eye';
-            }
-        });
-        
-        // Ввод пароля по Enter
-        document.getElementById('passwordInput').addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') {
-                login();
-            }
-        });
-        
-        // Кнопка входа
-        document.getElementById('loginBtn').addEventListener('click', login);
-        
-        // Быстрый вход
-        function quickLogin(password) {
-            document.getElementById('passwordInput').value = password;
-            login();
-        }
-        
-        // Обновление статуса
-        function updateStatus(status) {
-            const statusElement = document.getElementById('statusIndicator');
-            const connectionStatus = document.getElementById('connectionStatus');
-            
-            if (statusElement) {
-                statusElement.className = 'status-indicator';
-                
-                switch(status) {
-                    case 'online':
-                        statusElement.classList.add('status-online');
-                        statusElement.innerHTML = '<i class="fas fa-check-circle"></i><span>Онлайн</span>';
-                        break;
-                    case 'offline':
-                        statusElement.classList.add('status-offline');
-                        statusElement.innerHTML = '<i class="fas fa-laptop"></i><span>Локально</span>';
-                        break;
-                    case 'loading':
-                        statusElement.innerHTML = '<i class="fas fa-sync-alt status-icon"></i><span>Завантаження...</span>';
-                        break;
-                }
-            }
-            
-            if (connectionStatus) {
-                switch(status) {
-                    case 'online':
-                        connectionStatus.innerHTML = '<small style="color: rgba(255, 255, 255, 0.7);"><i class="fas fa-check-circle" style="color: #1a936f;"></i> Система готова</small>';
-                        break;
-                    case 'offline':
-                        connectionStatus.innerHTML = '<small style="color: rgba(255, 255, 255, 0.7);"><i class="fas fa-laptop" style="color: #ff9e00;"></i> Робота локально</small>';
-                        break;
-                    case 'loading':
-                        connectionStatus.innerHTML = '<small style="color: rgba(255, 255, 255, 0.7);"><i class="fas fa-sync-alt fa-spin"></i> Завантаження системи...</small>';
-                        break;
-                }
+                updateStatus('📦 Використовується локальне сховище', 'disconnected');
+                await updateStats();
+                await showSystemInfo();
             }
         }
-
-        // Инициализация системы
-        async function initSystem() {
-            console.log('Ініціалізація системи...');
-            updateStatus('loading');
-            
-            // Автофокус на поле ввода
-            setTimeout(() => {
-                const passwordInput = document.getElementById('passwordInput');
-                if (passwordInput) {
-                    passwordInput.focus();
-                }
-            }, 300);
-            
-            // Пробуем подключить Supabase
-            setTimeout(async () => {
-                try {
-                    // Проверяем, есть ли Supabase клиент
-                    if (window.supabaseClient && typeof window.supabaseClient.init === 'function') {
-                        const supabaseReady = await window.supabaseClient.init();
-                        
-                        if (supabaseReady) {
-                            updateStatus('online');
-                            console.log('✅ Supabase підключено');
-                        } else {
-                            updateStatus('offline');
-                            console.log('⚠️ Працюємо локально');
-                        }
-                    } else {
-                        updateStatus('offline');
-                        console.log('⚠️ Supabase клієнт не знайдено');
-                    }
-                } catch (error) {
-                    console.error('Помилка ініціалізації:', error);
-                    updateStatus('offline');
-                }
-            }, 800);
-        }
         
-        // Инициализация при загрузке
-        document.addEventListener('DOMContentLoaded', function() {
-            createParticles();
-            
-            // Проверяем, авторизован ли пользователь
-            const userData = JSON.parse(sessionStorage.getItem('horting_user'));
-            if (userData) {
-                if (userData.role === 'admin') {
-                    window.location.href = 'dashboard.html';
-                } else {
-                    window.location.href = 'team.html';
-                }
+        async function testSystem() {
+            if (!window.HortingStorage) {
+                alert('Спочатку ініціалізуйте систему!');
                 return;
             }
             
-            // Инициализируем систему
-            initSystem();
+            try {
+                // Тест получения команды
+                const team1 = await window.HortingStorage.getTeam(1);
+                console.log('Команда 1:', team1);
+                
+                // Тест добавления участника
+                await window.HortingStorage.addTeamMember(1, {
+                    name: 'Тестовий Учасник',
+                    role: 'скаут',
+                    age: 15
+                });
+                
+                // Тест добавления задачи
+                await window.HortingStorage.addTeamTask(1, {
+                    title: 'Тестова задача',
+                    description: 'Перевірка системи',
+                    priority: 'high'
+                });
+                
+                // Тест уведомления
+                await window.HortingStorage.addGlobalNotification({
+                    title: 'Тестове сповіщення',
+                    message: 'Система працює коректно!',
+                    author: 'Система'
+                });
+                
+                alert('✅ Тест пройшов успішно!\nПеревірте консоль та Telegram.');
+                
+                await updateStats();
+                await showSystemInfo();
+                
+            } catch (error) {
+                alert('❌ Помилка тесту: ' + error.message);
+            }
+        }
+        
+        async function addTestData() {
+            if (!confirm('Додати тестові дані до всіх команд?')) return;
             
-            // Просто отслеживаем состояние сети
-            window.addEventListener('online', () => {
-                console.log('✅ Інтернет з\'єднання відновлено');
-                updateStatus('online');
-            });
-
-            window.addEventListener('offline', () => {
-                console.log('⚠️ Немає інтернет з\'єднання');
-                updateStatus('offline');
-            });
+            try {
+                // Добавляем тестовых участников
+                const testMembers = [
+                    { name: 'Олексій Коваленко', role: 'лідер', age: 16 },
+                    { name: 'Марія Шевченко', role: 'скаут', age: 14 },
+                    { name: 'Дмитро Бондар', role: 'кухар', age: 15 },
+                    { name: 'Анна Мельник', role: 'медик', age: 15 },
+                    { name: 'Юрій Гриценко', role: 'скаут', age: 14 },
+                    { name: 'Софія Коваль', role: 'скаут', age: 13 }
+                ];
+                
+                for (let i = 1; i <= 6; i++) {
+                    await window.HortingStorage.addTeamMember(i, testMembers[i-1]);
+                    
+                    await window.HortingStorage.addTeamTask(i, {
+                        title: `Завдання для команди ${i}`,
+                        description: 'Підготувати спорядження',
+                        priority: 'medium',
+                        deadline: new Date(Date.now() + 86400000 * 3).toISOString().split('T')[0]
+                    });
+                }
+                
+                await window.HortingStorage.addGlobalNotification({
+                    title: 'Тестові дані додано',
+                    message: 'Усі команди мають тестових учасників та завдання.',
+                    author: 'Система'
+                });
+                
+                alert('✅ Тестові дані успішно додано!');
+                await updateStats();
+                
+            } catch (error) {
+                alert('❌ Помилка: ' + error.message);
+            }
+        }
+        
+        async function addTeamMember(teamId, name, role) {
+            try {
+                await window.HortingStorage.addTeamMember(teamId, {
+                    name: name,
+                    role: role,
+                    age: Math.floor(Math.random() * 5) + 12
+                });
+                
+                alert(`✅ Учасника "${name}" додано до команди ${teamId}`);
+                await updateStats();
+                
+            } catch (error) {
+                alert('❌ Помилка: ' + error.message);
+            }
+        }
+        
+        async function addTeamTask(teamId, title) {
+            try {
+                await window.HortingStorage.addTeamTask(teamId, {
+                    title: title,
+                    description: 'Важливе завдання для команди',
+                    priority: 'high'
+                });
+                
+                alert(`✅ Завдання "${title}" додано для команди ${teamId}`);
+                await updateStats();
+                
+            } catch (error) {
+                alert('❌ Помилка: ' + error.message);
+            }
+        }
+        
+        async function addGlobalNotification(title, author) {
+            try {
+                await window.HortingStorage.addGlobalNotification({
+                    title: title,
+                    message: 'Це важливе повідомлення для всіх учасників.',
+                    author: author
+                });
+                
+                alert(`✅ Сповіщення "${title}" додано`);
+                await updateStats();
+                
+            } catch (error) {
+                alert('❌ Помилка: ' + error.message);
+            }
+        }
+        
+        async function syncData() {
+            updateStatus('🔄 Синхронізація...', 'disconnected');
+            
+            try {
+                const success = await window.HortingStorage.syncWithTelegram();
+                
+                if (success) {
+                    updateStatus('✅ Дані синхронізовано', 'connected');
+                    await updateStats();
+                    await showSystemInfo();
+                    alert('✅ Синхронізація успішна!');
+                } else {
+                    updateStatus('❌ Помилка синхронізації', 'disconnected');
+                    alert('❌ Не вдалося синхронізувати дані');
+                }
+            } catch (error) {
+                updateStatus('❌ Помилка', 'disconnected');
+                alert('❌ Помилка: ' + error.message);
+            }
+        }
+        
+        async function exportData() {
+            try {
+                const data = await window.HortingStorage.exportData();
+                const dataStr = JSON.stringify(data, null, 2);
+                const blob = new Blob([dataStr], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `horting_backup_${new Date().toISOString().split('T')[0]}.json`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                
+                URL.revokeObjectURL(url);
+                
+                alert('✅ Дані експортовано у файл!');
+                
+            } catch (error) {
+                alert('❌ Помилка експорту: ' + error.message);
+            }
+        }
+        
+        async function resetData() {
+            if (!confirm('⚠️ ВИ ВПЕВНЕНІ?\n\nЦя дія видалить ВСІ дані:\n• Усіх учасників\n• Всі завдання\n• Всі сповіщення\n\nДію неможливо скасувати!')) {
+                return;
+            }
+            
+            try {
+                const success = await window.HortingStorage.resetToDefault();
+                
+                if (success) {
+                    updateStatus('🔄 Дані скинуто', 'disconnected');
+                    await updateStats();
+                    alert('✅ Всі дані успішно видалено!');
+                } else {
+                    alert('❌ Помилка очищення');
+                }
+            } catch (error) {
+                alert('❌ Помилка: ' + error.message);
+            }
+        }
+        
+        // ==================== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ====================
+        
+        function updateStatus(message, className) {
+            const statusEl = document.getElementById('status');
+            statusEl.textContent = message;
+            statusEl.className = 'status ' + className;
+        }
+        
+        async function updateStats() {
+            try {
+                const teams = await window.HortingStorage.getAllTeams();
+                
+                // Подсчет статистики
+                let totalMembers = 0;
+                let totalTasks = 0;
+                
+                for (const team of Object.values(teams)) {
+                    totalMembers += team.members ? team.members.length : 0;
+                    totalTasks += team.tasks ? team.tasks.length : 0;
+                }
+                
+                const notifications = await window.HortingStorage.getGlobalNotifications();
+                const messages = await window.HortingStorage.getAdminMessages();
+                
+                // Обновляем UI
+                document.getElementById('teamCount').textContent = Object.keys(teams).length;
+                document.getElementById('memberCount').textContent = totalMembers;
+                document.getElementById('taskCount').textContent = totalTasks;
+                document.getElementById('notificationCount').textContent = notifications.length;
+                
+            } catch (error) {
+                console.error('Помилка оновлення статистики:', error);
+            }
+        }
+        
+        async function showSystemInfo() {
+            try {
+                const teams = await window.HortingStorage.getAllTeams();
+                const notifications = await window.HortingStorage.getGlobalNotifications();
+                const messages = await window.HortingStorage.getAdminMessages();
+                
+                let info = `
+                <strong>📊 Статистика системи:</strong><br>
+                • Команд: ${Object.keys(teams).length}<br>
+                • Учасників: ${Object.values(teams).reduce((sum, team) => sum + (team.members ? team.members.length : 0), 0)}<br>
+                • Завдань: ${Object.values(teams).reduce((sum, team) => sum + (team.tasks ? team.tasks.length : 0), 0)}<br>
+                • Сповіщень: ${notifications.length}<br>
+                • Повідомлень адміністраторам: ${messages.length}<br><br>
+                <strong>🌐 З'єднання:</strong> ${window.HortingStorage.isConnected ? '✅ Telegram' : '📦 Локальне сховище'}
+                `;
+                
+                document.getElementById('systemInfo').innerHTML = info;
+                
+            } catch (error) {
+                document.getElementById('systemInfo').textContent = 'Помилка завантаження інформації';
+            }
+        }
+        
+        // ==================== АВТОМАТИЧЕСКАЯ ИНИЦИАЛИЗАЦИЯ ====================
+        
+        window.addEventListener('DOMContentLoaded', async () => {
+            console.log('🚀 Horting System завантажується...');
+            await initStorage();
         });
     </script>
+    
+    <!-- Подключаем Telegram Storage -->
+    <script src="telegram-horting-storage.js"></script>
 </body>
 </html>
